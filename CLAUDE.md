@@ -49,7 +49,7 @@ src/
     ├── DebugPanel.tsx          # API requests panel
     ├── BillPayView.tsx         # Bill Pay main view
     ├── BillPaymentList.tsx     # Payment list
-    ├── BillPaymentDetail.tsx   # Payment detail + settle button
+    ├── BillPaymentDetail.tsx   # Payment detail with timeline
     └── CreateBillPaymentModal.tsx  # New payment modal
 ```
 
@@ -61,22 +61,37 @@ Two-legged payment with settlement simulation:
 
 1. **Create Payment** - User fills form, selects network (ACH/RTP/Wire/Check/Card)
 2. **Debit Leg** - ACH transfer pulls funds from external account
-3. **Settlement** - Click "Settle Debit & Send Payment" to simulate settlement
+3. **Settlement** - Simulation button advances the payment
 4. **Credit Leg** - Funds sent to vendor via selected network
+
+### Payment Detail View
+
+The detail view shows:
+- **Header**: Amount, status badge, simulation button (upper right)
+- **Details**: Network, created date, network-specific info
+- **Timeline**: Visual progress with completed/current/pending steps
+
+### Timeline by Network
+
+```
+All networks start with:
+  ● Debit initiated
+  ● Debit settled
+
+Then varies by network:
+  ACH:   ● ACH credit submitted → ● ACH credit settled
+  Wire:  ● Wire sent (instant)
+  RTP:   ● RTP sent (instant)
+  Check: ● Check mailed → ● Check deposited
+  Card:  ● Card created → ● Card authorized
+```
 
 ### Payment States
 
 ```
-pending_debit → debit_processing → [settle debit] → pending_credit → ...
+pending_debit → debit_processing → pending_credit → ...network-specific... → completed
                       ↓
-                 debit_failed
-
-Credit leg varies by network:
-- ACH:   pending_credit → credit_submitted → [settle credit] → completed
-- Wire:  pending_credit → completed (instant)
-- RTP:   pending_credit → completed (instant)
-- Check: pending_credit → credit_mailed → [simulate deposit] → completed
-- Card:  pending_credit → pending_authorization → [simulate auth] → completed
+                 debit_failed / failed
 ```
 
 ### Increase API Calls
@@ -87,10 +102,10 @@ Credit leg varies by network:
 
 **Credit Leg by Network:**
 - **ACH**: `achTransfers.create()` → `simulations.achTransfers.submit()` → `simulations.achTransfers.settle()`
-- **Wire**: `wireTransfers.create()` → `simulations.wireTransfers.submit()` (completes instantly)
+- **Wire**: `wireTransfers.create()` → `simulations.wireTransfers.submit()` (instant)
 - **RTP**: `accountNumbers.create()` → `realTimePaymentsTransfers.create()` → `simulations.realTimePaymentsTransfers.complete()` (instant)
-- **Check**: `accountNumbers.create()` → `checkTransfers.create()` → `simulations.checkTransfers.mail()` → `simulations.inboundCheckDeposits.create()` (simulates recipient depositing the check)
-- **Card**: `cards.create()` → `simulations.cardAuthorizations.create()` (card available immediately, awaits authorization)
+- **Check**: `accountNumbers.create()` → `checkTransfers.create()` → `simulations.checkTransfers.mail()` → `simulations.inboundCheckDeposits.create()`
+- **Card**: `cards.create()` → `simulations.cardAuthorizations.create()`
 
 ## Demo Session Setup
 
@@ -117,8 +132,10 @@ pnpm build      # Production build
 pnpm exec tsc --noEmit  # Type check
 ```
 
-## Mantine Components Used
+## Key Implementation Details
 
-- `Card`, `Text`, `Title`, `Badge`, `Button`, `Divider`, `Alert`, `Anchor`
-- `TextInput`, `PasswordInput`, `NumberInput`, `Select`, `Radio`, `Group`
-- `Modal`, `MantineProvider`
+- ACH debit uses **negative amount** to pull FROM external account
+- RTP and Check require creating an Account Number on-demand
+- Card payments store `cardId` and `cardLast4` for display
+- Check payments store `checkNumber` and `sourceAccountNumberId` for deposit simulation
+- Dashboard links map resource types to URL paths (transfers use `/transfers` prefix)
