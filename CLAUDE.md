@@ -144,6 +144,14 @@ Test files:
 - `src/test/mocks/handlers.ts` - MSW handlers for Increase API
 - `src/test/bill-pay.test.tsx` - Bill pay flow integration test
 
+## Deployment
+
+Deploy to Vercel by connecting the GitHub repo. The `vercel.json` configures rewrites to proxy `/api/*` requests to the Increase sandbox API.
+
+```bash
+pnpm build      # Test production build locally
+```
+
 ## Key Implementation Details
 
 - ACH debit uses **negative amount** to pull FROM external account
