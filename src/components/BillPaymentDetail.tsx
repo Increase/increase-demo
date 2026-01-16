@@ -309,7 +309,7 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
                 onClick={simulationAction.onClick}
                 loading={isLoading}
               >
-                🪄 {simulationAction.label}
+                ✨ {simulationAction.label}
               </Button>
             )}
           </div>

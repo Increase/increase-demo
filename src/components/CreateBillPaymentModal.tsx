@@ -209,8 +209,8 @@ export function CreateBillPaymentModal({
             <Text size="sm" fw={500}>
               {network === 'check' ? 'Check Details' : network === 'card' ? 'Card Details' : 'Recipient Bank Details'}
             </Text>
-            <Button size="xs" variant="light" onClick={fillDummyDetails}>
-              Fill Demo Data
+            <Button size="xs" color="violet" onClick={fillDummyDetails}>
+              ✨ Fill Demo Data
             </Button>
           </div>
 
