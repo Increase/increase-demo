@@ -229,7 +229,7 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
       </Button>
 
       <Card shadow="sm" padding="lg" radius="md" withBorder>
-        {/* Header with amount, status, and simulation button */}
+        {/* Header with amount and status */}
         <div className="flex justify-between items-start mb-4">
           <div>
             <Text size="xl" fw={600}>
@@ -239,16 +239,6 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
               {statusConfig.label}
             </Badge>
           </div>
-          {simulationAction && (
-            <Button
-              size="sm"
-              variant="light"
-              onClick={simulationAction.onClick}
-              loading={isLoading}
-            >
-              {simulationAction.label}
-            </Button>
-          )}
         </div>
 
         {/* Payment Details */}
@@ -310,7 +300,19 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
 
         {/* Timeline */}
         <div className="flex flex-col gap-3">
-          <Text fw={600} size="sm">Timeline</Text>
+          <div className="flex justify-between items-center">
+            <Text fw={600} size="sm">Timeline</Text>
+            {simulationAction && (
+              <Button
+                size="xs"
+                color="lime"
+                onClick={simulationAction.onClick}
+                loading={isLoading}
+              >
+                🪄 {simulationAction.label}
+              </Button>
+            )}
+          </div>
           <Timeline steps={timelineSteps} />
         </div>
 
