@@ -305,7 +305,7 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
             {simulationAction && (
               <Button
                 size="xs"
-                color="lime"
+                color="violet"
                 onClick={simulationAction.onClick}
                 loading={isLoading}
               >
