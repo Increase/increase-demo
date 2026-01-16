@@ -15,6 +15,7 @@ interface SetupScreenProps {
 export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_INCREASE_API_KEY ?? '');
   const [companyName, setCompanyName] = useState(import.meta.env.VITE_COMPANY_NAME ?? '');
+  const [endUserName, setEndUserName] = useState(import.meta.env.VITE_END_USER_NAME ?? 'DemoCustomer, Inc');
   const [product, setProduct] = useState<Product>('bill_pay');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
     setError(null);
 
     try {
-      const config = { apiKey, companyName, product };
+      const config = { apiKey, companyName, endUserName, product };
       const sessionData = await setupDemoSession(config, addRequest);
       onSessionCreated({
         config,
@@ -41,7 +42,7 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
     }
   };
 
-  const isFormValid = apiKey.trim() && companyName.trim();
+  const isFormValid = apiKey.trim() && companyName.trim() && endUserName.trim();
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
@@ -62,9 +63,18 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
           />
           <TextInput
             label="Company Name"
+            description="The bill pay platform"
             placeholder="Enter company name for the demo"
             value={companyName}
             onChange={(e) => setCompanyName(e.currentTarget.value)}
+            disabled={isLoading}
+          />
+          <TextInput
+            label="End User Name"
+            description="The customer using the bill pay platform"
+            placeholder="Enter end user name"
+            value={endUserName}
+            onChange={(e) => setEndUserName(e.currentTarget.value)}
             disabled={isLoading}
           />
           <Select

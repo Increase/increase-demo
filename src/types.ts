@@ -15,6 +15,7 @@ export interface ApiRequest {
 export interface DemoSessionConfig {
   apiKey: string;
   companyName: string;
+  endUserName: string;
   product: Product;
 }
 

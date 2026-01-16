@@ -130,7 +130,19 @@ pnpm install
 pnpm dev        # http://localhost:5173/
 pnpm build      # Production build
 pnpm exec tsc --noEmit  # Type check
+pnpm test       # Run tests
 ```
+
+## Testing
+
+Tests use Vitest + React Testing Library with MSW for API mocking. Run `pnpm test` to verify changes work correctly.
+
+**Always run tests after making changes** to ensure nothing is broken. The test suite covers the complete bill pay flow including payment creation and settlement.
+
+Test files:
+- `src/test/setup.ts` - Test setup with MSW and jsdom mocks
+- `src/test/mocks/handlers.ts` - MSW handlers for Increase API
+- `src/test/bill-pay.test.tsx` - Bill pay flow integration test
 
 ## Key Implementation Details
 

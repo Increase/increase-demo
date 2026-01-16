@@ -1,13 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button, TextInput, NumberInput, Select, Radio, Group, Text } from '@mantine/core';
 import type { PaymentNetwork, PaymentDetails } from '../types';
 import type Increase from 'increase';
+
+export interface PrefillData {
+  amount?: number; // in cents
+  network?: PaymentNetwork;
+  accountNumber?: string;
+  routingNumber?: string;
+  statementDescriptor?: string;
+}
 
 interface CreateBillPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (externalAccountId: string, amount: number, paymentDetails: PaymentDetails) => Promise<void>;
   externalAccounts: Increase.ExternalAccount[];
+  prefillData?: PrefillData;
 }
 
 const DUMMY_ACH_DETAILS = {
@@ -31,6 +40,7 @@ export function CreateBillPaymentModal({
   onClose,
   onSubmit,
   externalAccounts,
+  prefillData,
 }: CreateBillPaymentModalProps) {
   const [externalAccountId, setExternalAccountId] = useState<string | null>(null);
   const [amount, setAmount] = useState<string | number>('');
@@ -42,6 +52,31 @@ export function CreateBillPaymentModal({
   const [accountNumber, setAccountNumber] = useState('');
   const [routingNumber, setRoutingNumber] = useState('');
   const [statementDescriptor, setStatementDescriptor] = useState('');
+
+  // Apply prefill data when modal opens with prefill
+  useEffect(() => {
+    if (isOpen && prefillData) {
+      if (prefillData.amount !== undefined) {
+        setAmount(prefillData.amount / 100); // Convert cents to dollars for display
+      }
+      if (prefillData.network) {
+        setNetwork(prefillData.network);
+      }
+      if (prefillData.accountNumber) {
+        setAccountNumber(prefillData.accountNumber);
+      }
+      if (prefillData.routingNumber) {
+        setRoutingNumber(prefillData.routingNumber);
+      }
+      if (prefillData.statementDescriptor) {
+        setStatementDescriptor(prefillData.statementDescriptor);
+      }
+      // Auto-select first external account if available
+      if (externalAccounts.length > 0 && !externalAccountId) {
+        setExternalAccountId(externalAccounts[0].id);
+      }
+    }
+  }, [isOpen, prefillData, externalAccounts, externalAccountId]);
 
   // Check fields
   const [recipientName, setRecipientName] = useState('');
@@ -73,6 +108,17 @@ export function CreateBillPaymentModal({
       setStatementDescriptor(DUMMY_ACH_DETAILS.statementDescriptor);
     }
   };
+
+  // Check if any network-specific fields have data
+  const hasFormData = (() => {
+    if (network === 'check') {
+      return !!(recipientName || addressLine1 || city || state || zip);
+    } else if (network === 'card') {
+      return !!cardDescription;
+    } else {
+      return !!(accountNumber || routingNumber || statementDescriptor);
+    }
+  })();
 
   const resetForm = () => {
     setExternalAccountId(null);
@@ -209,9 +255,11 @@ export function CreateBillPaymentModal({
             <Text size="sm" fw={500}>
               {network === 'check' ? 'Check Details' : network === 'card' ? 'Card Details' : 'Recipient Bank Details'}
             </Text>
-            <Button size="xs" color="violet" onClick={fillDummyDetails}>
-              ✨ Fill Demo Data
-            </Button>
+            {!hasFormData && (
+              <Button size="xs" color="violet" onClick={fillDummyDetails}>
+                ✨ Fill Demo Data
+              </Button>
+            )}
           </div>
 
           {network === 'card' ? (

@@ -5,7 +5,9 @@ import { useBillPayments } from '../context/BillPaymentContext';
 import { useApiLog } from '../context/ApiLogContext';
 import { BillPaymentList } from './BillPaymentList';
 import { BillPaymentDetail } from './BillPaymentDetail';
-import { CreateBillPaymentModal } from './CreateBillPaymentModal';
+import { CreateBillPaymentModal, type PrefillData } from './CreateBillPaymentModal';
+import { CardPaymentPage } from './CardPaymentPage';
+import { SAMPLE_INVOICE } from '../lib/sampleInvoice';
 
 interface BillPayViewProps {
   session: DemoSession;
@@ -13,7 +15,10 @@ interface BillPayViewProps {
 
 export function BillPayView({ session }: BillPayViewProps) {
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [cardPaymentPagePaymentId, setCardPaymentPagePaymentId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProcessingInvoice, setIsProcessingInvoice] = useState(false);
+  const [prefillData, setPrefillData] = useState<PrefillData | undefined>(undefined);
   const { payments, createPayment, settleDebitAndCreateCredit, settleCreditTransfer, simulateCardAuthorization } = useBillPayments();
   const { addRequest } = useApiLog();
 
@@ -22,6 +27,11 @@ export function BillPayView({ session }: BillPayViewProps) {
   // Find selected payment from current payments list to get updated state
   const selectedPayment = selectedPaymentId
     ? payments.find((p) => p.id === selectedPaymentId) || null
+    : null;
+
+  // Find payment for card payment page
+  const cardPaymentPagePayment = cardPaymentPagePaymentId
+    ? payments.find((p) => p.id === cardPaymentPagePaymentId) || null
     : null;
 
   // Clear selection if payment no longer exists
@@ -71,6 +81,39 @@ export function BillPayView({ session }: BillPayViewProps) {
     );
   };
 
+  const handleInvoiceDrop = () => {
+    setIsProcessingInvoice(true);
+
+    // Simulate processing delay
+    setTimeout(() => {
+      setIsProcessingInvoice(false);
+      setPrefillData({
+        amount: SAMPLE_INVOICE.amount,
+        network: 'ach',
+        accountNumber: SAMPLE_INVOICE.achInstructions.accountNumber,
+        routingNumber: SAMPLE_INVOICE.achInstructions.routingNumber,
+        statementDescriptor: SAMPLE_INVOICE.invoiceNumber,
+      });
+      setIsModalOpen(true);
+    }, 1500);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setPrefillData(undefined);
+  };
+
+  // Show CardPaymentPage if we're in that view
+  if (cardPaymentPagePayment) {
+    return (
+      <CardPaymentPage
+        payment={cardPaymentPagePayment}
+        config={session.config}
+        onBack={() => setCardPaymentPagePaymentId(null)}
+      />
+    );
+  }
+
   return (
     <div className="p-6 h-full overflow-auto">
       <div className="mb-6">
@@ -85,20 +128,24 @@ export function BillPayView({ session }: BillPayViewProps) {
           onSettleAndPay={handleSettleAndPay}
           onSettleCredit={handleSettleCredit}
           onSimulateCardAuth={handleSimulateCardAuth}
+          onOpenCardPaymentPage={(paymentId) => setCardPaymentPagePaymentId(paymentId)}
         />
       ) : (
         <BillPaymentList
           payments={payments}
           onSelect={(payment) => setSelectedPaymentId(payment.id)}
           onCreateNew={() => setIsModalOpen(true)}
+          onInvoiceDrop={handleInvoiceDrop}
+          isProcessingInvoice={isProcessingInvoice}
         />
       )}
 
       <CreateBillPaymentModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         onSubmit={handleCreatePayment}
         externalAccounts={externalAccounts}
+        prefillData={prefillData}
       />
     </div>
   );

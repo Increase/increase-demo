@@ -1,10 +1,13 @@
-import { Card, Badge, Button, Text } from '@mantine/core';
+import { useState } from 'react';
+import { Card, Badge, Button, Text, Loader } from '@mantine/core';
 import type { BillPayment, BillPaymentStatus } from '../types';
 
 interface BillPaymentListProps {
   payments: BillPayment[];
   onSelect: (payment: BillPayment) => void;
   onCreateNew: () => void;
+  onInvoiceDrop: () => void;
+  isProcessingInvoice?: boolean;
 }
 
 const STATUS_CONFIG: Record<BillPaymentStatus, { label: string; color: string }> = {
@@ -27,7 +30,29 @@ const NETWORK_LABELS: Record<string, string> = {
   card: 'Card',
 };
 
-export function BillPaymentList({ payments, onSelect, onCreateNew }: BillPaymentListProps) {
+export function BillPaymentList({ payments, onSelect, onCreateNew, onInvoiceDrop, isProcessingInvoice }: BillPaymentListProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type === 'application/pdf') {
+      onInvoiceDrop();
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
@@ -35,6 +60,36 @@ export function BillPaymentList({ payments, onSelect, onCreateNew }: BillPayment
         <Button size="sm" onClick={onCreateNew}>
           New Payment
         </Button>
+      </div>
+
+      {/* Invoice Drop Zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          isDragging
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-300 hover:border-gray-400'
+        }`}
+      >
+        {isProcessingInvoice ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader size="sm" />
+            <Text size="sm" c="dimmed">Processing invoice...</Text>
+          </div>
+        ) : (
+          <>
+            <Text size="sm" c="dimmed">
+              Drop an invoice PDF here to auto-fill payment details
+            </Text>
+            <Text size="xs" c="dimmed" mt="xs">
+              <a href="/sample-invoice.pdf" download className="text-blue-600 hover:underline">
+                Download sample invoice
+              </a>
+            </Text>
+          </>
+        )}
       </div>
 
       {payments.length === 0 ? (

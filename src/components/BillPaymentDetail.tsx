@@ -8,6 +8,7 @@ interface BillPaymentDetailProps {
   onSettleAndPay: (paymentId: string) => Promise<void>;
   onSettleCredit: (paymentId: string) => Promise<void>;
   onSimulateCardAuth: (paymentId: string) => Promise<void>;
+  onOpenCardPaymentPage?: (paymentId: string) => void;
 }
 
 const STATUS_CONFIG: Record<BillPaymentStatus, { label: string; color: string }> = {
@@ -158,7 +159,7 @@ function Timeline({ steps }: { steps: TimelineStep[] }) {
   );
 }
 
-export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCredit, onSimulateCardAuth }: BillPaymentDetailProps) {
+export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCredit, onSimulateCardAuth, onOpenCardPaymentPage }: BillPaymentDetailProps) {
   const [isLoading, setIsLoading] = useState(false);
   const statusConfig = STATUS_CONFIG[payment.status];
   const details = payment.paymentDetails;
@@ -291,6 +292,16 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
                   <Text c="dimmed">Card:</Text>
                   <Text ff="monospace">•••• {payment.cardLast4}</Text>
                 </div>
+              )}
+              {payment.status === 'pending_authorization' && onOpenCardPaymentPage && (
+                <Button
+                  size="xs"
+                  color="violet"
+                  onClick={() => onOpenCardPaymentPage(payment.id)}
+                  mt="xs"
+                >
+                  ✨ Demo Card Payment Page
+                </Button>
               )}
             </>
           )}
