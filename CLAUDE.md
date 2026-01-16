@@ -1,0 +1,124 @@
+# Increase Demo App
+
+## Purpose
+
+A client-side demo application for showcasing the [Increase](https://increase.com) banking API. Runs entirely in the browser on localhost, connecting to the Increase sandbox environment.
+
+## Tech Stack
+
+- **Framework**: React 19 + TypeScript
+- **Build Tool**: Vite 7
+- **UI Library**: Mantine (self-contained styling, works out of the box)
+- **Styling**: Tailwind CSS v4 (layout utilities only)
+- **API Client**: Increase TypeScript SDK
+- **Package Manager**: pnpm
+
+## Architecture
+
+### CORS Proxy
+
+The Increase API doesn't allow browser CORS requests. Vite's dev server proxies `/api/*` to `https://sandbox.increase.com`. The Increase SDK uses `baseURL: ${window.location.origin}/api`.
+
+### State Management
+
+React Context for global state:
+- `ApiLogContext` - Tracks API requests for debug panel
+- `BillPaymentContext` - Bill payment state and operations
+
+### Layout
+
+Split-screen layout:
+- **Left**: End-user experience
+- **Right**: Debug panel with API requests and "Open in Dashboard" links
+
+## Project Structure
+
+```
+src/
+├── App.tsx                     # Main app, session state
+├── main.tsx                    # React entry point, MantineProvider
+├── types.ts                    # TypeScript types
+├── lib/
+│   └── increase.ts             # Increase client, setupDemoSession()
+├── context/
+│   ├── ApiLogContext.tsx       # API request logging
+│   └── BillPaymentContext.tsx  # Bill payment state
+└── components/
+    ├── SetupScreen.tsx         # API key & config form
+    ├── DemoLayout.tsx          # Split-screen wrapper
+    ├── DebugPanel.tsx          # API requests panel
+    ├── BillPayView.tsx         # Bill Pay main view
+    ├── BillPaymentList.tsx     # Payment list
+    ├── BillPaymentDetail.tsx   # Payment detail + settle button
+    └── CreateBillPaymentModal.tsx  # New payment modal
+```
+
+## Bill Pay Product
+
+### Payment Flow
+
+Two-legged payment with settlement simulation:
+
+1. **Create Payment** - User fills form, selects network (ACH/RTP/Wire/Check/Card)
+2. **Debit Leg** - ACH transfer pulls funds from external account
+3. **Settlement** - Click "Settle Debit & Send Payment" to simulate settlement
+4. **Credit Leg** - Funds sent to vendor via selected network
+
+### Payment States
+
+```
+pending_debit → debit_processing → [settle debit] → pending_credit → ...
+                      ↓
+                 debit_failed
+
+Credit leg varies by network:
+- ACH:   pending_credit → credit_submitted → [settle credit] → completed
+- Wire:  pending_credit → completed (instant)
+- RTP:   pending_credit → completed (instant)
+- Check: pending_credit → credit_mailed → [simulate deposit] → completed
+- Card:  pending_credit → pending_authorization → [simulate auth] → completed
+```
+
+### Increase API Calls
+
+**Debit Leg:**
+- `achTransfers.create()` - Debit from external account (negative amount)
+- `simulations.achTransfers.settle()` - Simulate debit settlement
+
+**Credit Leg by Network:**
+- **ACH**: `achTransfers.create()` → `simulations.achTransfers.submit()` → `simulations.achTransfers.settle()`
+- **Wire**: `wireTransfers.create()` → `simulations.wireTransfers.submit()` (completes instantly)
+- **RTP**: `accountNumbers.create()` → `realTimePaymentsTransfers.create()` → `simulations.realTimePaymentsTransfers.complete()` (instant)
+- **Check**: `accountNumbers.create()` → `checkTransfers.create()` → `simulations.checkTransfers.mail()` → `simulations.inboundCheckDeposits.create()` (simulates recipient depositing the check)
+- **Card**: `cards.create()` → `simulations.cardAuthorizations.create()` (card available immediately, awaits authorization)
+
+## Demo Session Setup
+
+On start, automatically creates:
+1. Corporation Entity (demo data)
+2. Account linked to Entity
+3. External Account (funding source for bill payments)
+
+## Environment Variables
+
+Optional `.env` to prefill setup form:
+
+```
+VITE_INCREASE_API_KEY=your_sandbox_api_key
+VITE_COMPANY_NAME=Your Company Name
+```
+
+## Development
+
+```bash
+pnpm install
+pnpm dev        # http://localhost:5173/
+pnpm build      # Production build
+pnpm exec tsc --noEmit  # Type check
+```
+
+## Mantine Components Used
+
+- `Card`, `Text`, `Title`, `Badge`, `Button`, `Divider`, `Alert`, `Anchor`
+- `TextInput`, `PasswordInput`, `NumberInput`, `Select`, `Radio`, `Group`
+- `Modal`, `MantineProvider`
