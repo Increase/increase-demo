@@ -25,6 +25,16 @@ describe('Bill Pay Flow', () => {
     await user.clear(companyNameInput);
     await user.type(companyNameInput, 'Test Company');
 
+    // Select Bill Pay product (since Banking is now default)
+    const productLabel = screen.getByText('Product');
+    const productWrapper = productLabel.closest('.mantine-Select-root') || productLabel.parentElement;
+    const productInput = productWrapper?.querySelector('input');
+    await user.click(productInput!);
+    await waitFor(() => {
+      expect(screen.getByText('Bill Pay')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('Bill Pay'));
+
     const createSessionButton = screen.getByRole('button', { name: /create demo session/i });
     await user.click(createSessionButton);
 

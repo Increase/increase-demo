@@ -1,6 +1,6 @@
 import type Increase from 'increase';
 
-export type Product = 'bill_pay';
+export type Product = 'bill_pay' | 'banking';
 
 export interface ApiRequest {
   id: string;
@@ -24,6 +24,10 @@ export interface DemoSession {
   entity: Increase.Entity;
   account: Increase.Account;
   externalAccount?: Increase.ExternalAccount;
+  // Banking product
+  accountNumber?: Increase.AccountNumber;
+  lockbox?: Increase.Lockbox;
+  cards?: Increase.Card[];
 }
 
 // Bill Payment Types
@@ -97,3 +101,13 @@ export interface BillPayment {
   cardLast4?: string;
   error?: string;
 }
+
+// Banking Types
+export type BankingViewState =
+  | { view: 'overview' }
+  | { view: 'transaction_detail'; transactionId: string }
+  | { view: 'lockbox_detail' }
+  | { view: 'cards_list' }
+  | { view: 'card_detail'; cardId: string };
+
+export type InboundTransferType = 'ach' | 'wire' | 'check';

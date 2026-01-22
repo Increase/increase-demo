@@ -24,6 +24,11 @@ function getDashboardPath(resourceType: string, id: string): string | null {
     real_time_payments_transfers: 'transfers',
     check_transfers: 'transfers',
     cards: 'cards',
+    transactions: 'transactions',
+    lockboxes: 'lockboxes',
+    inbound_ach_transfers: 'inbound_ach_transfers',
+    inbound_wire_transfers: 'inbound_wire_transfers',
+    inbound_check_deposits: 'inbound_check_deposits',
     simulations: null,
   };
   const dashboardType = typeMap[resourceType];
@@ -135,6 +140,123 @@ export async function setupDemoSession(
           account_holder: 'business',
           funding: 'checking',
         })
+    );
+  }
+
+  if (config.product === 'banking') {
+    // Phase 1: Create account number, lockbox, and cards in parallel
+    const cardData = [
+      { description: 'Employee Expenses', merchant: 'UBER EATS', amount: 4523 },
+      { description: 'Marketing Budget', merchant: 'GOOGLE ADS', amount: 75000 },
+      { description: 'Office Supplies', merchant: 'STAPLES', amount: 12499 },
+    ];
+
+    const [accountNumber, lockbox, ...cards] = await Promise.all([
+      loggedRequest(logFn, 'POST', 'account_numbers', () =>
+        client.accountNumbers.create({
+          account_id: account.id,
+          name: 'Primary Account Number',
+        })
+      ),
+      loggedRequest(logFn, 'POST', 'lockboxes', () =>
+        client.lockboxes.create({
+          account_id: account.id,
+          description: 'Primary Lockbox',
+        })
+      ),
+      ...cardData.map(({ description }) =>
+        loggedRequest(logFn, 'POST', 'cards', () =>
+          client.cards.create({
+            account_id: account.id,
+            description,
+          })
+        )
+      ),
+    ]);
+
+    result.accountNumber = accountNumber;
+    result.lockbox = lockbox;
+    result.cards = cards;
+
+    // Phase 2a: Initial funding via inbound wire ($10,000)
+    await loggedRequest(logFn, 'POST', 'simulations/inbound_wire_transfers', () =>
+      client.simulations.inboundWireTransfers.create({
+        account_number_id: accountNumber.id,
+        amount: 1000000,
+      })
+    );
+
+    // Wait for balance to settle
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Phase 2b: Other seed transactions in parallel
+    const [mailItem, achTransfer] = await Promise.all([
+      // Inbound mail item with check ($2,500)
+      loggedRequest(logFn, 'POST', 'simulations/inbound_mail_items', () =>
+        client.simulations.inboundMailItems.create({
+          lockbox_id: lockbox.id,
+          amount: 250000,
+        })
+      ),
+      // Outbound ACH ($1,200 payroll)
+      loggedRequest(logFn, 'POST', 'ach_transfers', () =>
+        client.achTransfers.create({
+          account_id: account.id,
+          amount: 120000,
+          routing_number: '101050001',
+          account_number: '987654321',
+          statement_descriptor: 'Payroll',
+        })
+      ),
+    ]);
+
+    // Submit the check deposit from the mail item
+    const checkDepositId = mailItem.checks?.[0]?.check_deposit_id;
+    if (checkDepositId) {
+      await loggedRequest(logFn, 'POST', `simulations/check_deposits/${checkDepositId}/submit`, () =>
+        client.simulations.checkDeposits.submit(checkDepositId)
+      );
+    }
+
+    // Phase 3: ACH simulation (sequential) and card authorizations (parallel)
+    // Only submit if pending_approval or pending_submission
+    if (achTransfer.status === 'pending_approval' || achTransfer.status === 'pending_submission') {
+      await loggedRequest(logFn, 'POST', `simulations/ach_transfers/${achTransfer.id}/submit`, () =>
+        client.simulations.achTransfers.submit(achTransfer.id)
+      );
+    }
+    // Settle after submit
+    await loggedRequest(logFn, 'POST', `simulations/ach_transfers/${achTransfer.id}/settle`, () =>
+      client.simulations.achTransfers.settle(achTransfer.id, {})
+    );
+
+    // Card authorizations in parallel
+    const authResults = await Promise.all(
+      cards.map((card, i) =>
+        loggedRequest(logFn, 'POST', 'simulations/card_authorizations', () =>
+          client.simulations.cardAuthorizations.create({
+            card_id: card.id,
+            amount: cardData[i].amount,
+            merchant_descriptor: cardData[i].merchant,
+            merchant_category_code: '5999',
+          })
+        )
+      )
+    );
+
+    // Phase 4: Settle card authorizations in parallel
+    await Promise.all(
+      authResults.map((authResult, i) => {
+        if (authResult.pending_transaction) {
+          return loggedRequest(logFn, 'POST', 'simulations/card_settlements', () =>
+            client.simulations.cardSettlements.create({
+              card_id: cards[i].id,
+              pending_transaction_id: authResult.pending_transaction!.id,
+            })
+          );
+        }
+        return Promise.resolve();
+      })
     );
   }
 

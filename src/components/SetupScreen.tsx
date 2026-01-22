@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Card, TextInput, PasswordInput, Button, Select } from '@mantine/core';
+import { Card, TextInput, PasswordInput, Button, Select, Alert } from '@mantine/core';
 import { setupDemoSession } from '../lib/increase';
 import { useApiLog } from '../context/ApiLogContext';
 import type { DemoSession, Product } from '../types';
 
 const PRODUCTS: { value: Product; label: string }[] = [
   { value: 'bill_pay', label: 'Bill Pay' },
+  { value: 'banking', label: 'Banking' },
 ];
 
 interface SetupScreenProps {
@@ -16,7 +17,7 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_INCREASE_API_KEY ?? '');
   const [companyName, setCompanyName] = useState(import.meta.env.VITE_COMPANY_NAME ?? '');
   const [endUserName, setEndUserName] = useState(import.meta.env.VITE_END_USER_NAME ?? 'DemoCustomer, Inc');
-  const [product, setProduct] = useState<Product>('bill_pay');
+  const [product, setProduct] = useState<Product>('banking');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { addRequest } = useApiLog();
@@ -36,7 +37,29 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
         ...sessionData,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create demo session');
+      // Log full error for debugging
+      console.error('Demo session creation failed:', err);
+
+      // Extract detailed error message
+      let errorMessage = 'Failed to create demo session';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        // Check for Increase SDK error properties
+        const sdkError = err as Error & {
+          status?: number;
+          error?: { detail?: string; title?: string; type?: string; errors?: unknown[] };
+          detail?: string;
+        };
+        if (sdkError.error?.detail) {
+          errorMessage = `${sdkError.error.title || 'Error'}: ${sdkError.error.detail}`;
+          if (sdkError.error.errors?.length) {
+            errorMessage += ` (${JSON.stringify(sdkError.error.errors)})`;
+          }
+        } else if (sdkError.detail) {
+          errorMessage = sdkError.detail;
+        }
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +108,9 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
             disabled={isLoading}
           />
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <Alert color="red" title="Error" variant="light">
+              <pre className="whitespace-pre-wrap text-sm font-mono">{error}</pre>
+            </Alert>
           )}
           <Button
             type="submit"

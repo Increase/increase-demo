@@ -26,6 +26,9 @@ class ResizeObserverMock {
 }
 window.ResizeObserver = ResizeObserverMock;
 
+// Mock scrollIntoView for Mantine's Combobox
+Element.prototype.scrollIntoView = () => {};
+
 // Start MSW server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 

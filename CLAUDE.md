@@ -24,6 +24,7 @@ The Increase API doesn't allow browser CORS requests. Vite's dev server proxies 
 React Context for global state:
 - `ApiLogContext` - Tracks API requests for debug panel
 - `BillPaymentContext` - Bill payment state and operations
+- `BankingContext` - Banking state (account, transactions, cards, etc.)
 
 ### Layout
 
@@ -42,7 +43,8 @@ src/
 │   └── increase.ts             # Increase client, setupDemoSession()
 ├── context/
 │   ├── ApiLogContext.tsx       # API request logging
-│   └── BillPaymentContext.tsx  # Bill payment state
+│   ├── BillPaymentContext.tsx  # Bill payment state
+│   └── BankingContext.tsx      # Banking state and operations
 └── components/
     ├── SetupScreen.tsx         # API key & config form
     ├── DemoLayout.tsx          # Split-screen wrapper
@@ -50,7 +52,15 @@ src/
     ├── BillPayView.tsx         # Bill Pay main view
     ├── BillPaymentList.tsx     # Payment list
     ├── BillPaymentDetail.tsx   # Payment detail with timeline
-    └── CreateBillPaymentModal.tsx  # New payment modal
+    ├── CreateBillPaymentModal.tsx  # New payment modal
+    ├── BankingView.tsx         # Banking main view (navigation state)
+    ├── BankingOverview.tsx     # Banking overview with account details
+    ├── TransactionDetail.tsx   # Single transaction view
+    ├── LockboxDetail.tsx       # Lockbox info and transactions
+    ├── CardsListView.tsx       # List of cards
+    ├── CardDetail.tsx          # Card info and transactions
+    ├── CreateCardModal.tsx     # Modal to create new card
+    └── SimulateInboundModal.tsx # Modal for simulating inbound transfers
 ```
 
 ## Bill Pay Product
@@ -107,12 +117,83 @@ pending_debit → debit_processing → pending_credit → ...network-specific...
 - **Check**: `accountNumbers.create()` → `checkTransfers.create()` → `simulations.checkTransfers.mail()` → `simulations.inboundCheckDeposits.create()`
 - **Card**: `cards.create()` → `simulations.cardAuthorizations.create()`
 
+## Banking Product
+
+### Overview
+
+The Banking product demonstrates core banking features: account overview, transactions, account numbers, lockboxes, and cards.
+
+### Navigation Flow
+
+```
+BankingView (manages viewState)
+├── BankingOverview (default)
+│   ├── Account info + balance
+│   ├── Account Number (with Roll button)
+│   ├── Lockbox address (clickable, with Roll button)
+│   ├── Cards preview (3 cards, View All button)
+│   ├── Recent transactions (clickable)
+│   └── Simulate Receiving dropdown (Wire/ACH/Check)
+├── TransactionDetail ← click transaction
+├── LockboxDetail ← click lockbox section
+├── CardsListView ← click "View All"
+│   └── CreateCardModal
+└── CardDetail ← click card
+```
+
+### Demo Session Setup (Banking)
+
+Creates resources in parallel phases for speed:
+
+**Phase 1** (parallel):
+- Account Number
+- Lockbox
+- 3 Cards (Employee Expenses, Marketing Budget, Office Supplies)
+
+**Phase 2** (parallel):
+- Inbound wire transfer ($10,000) - initial funding
+- Inbound mail item with check ($2,500) - to lockbox
+- Outbound ACH transfer ($1,200) - payroll
+
+**Phase 3** (parallel):
+- ACH submit/settle
+- 3 Card authorizations (UBER EATS $45.23, GOOGLE ADS $750, STAPLES $124.99)
+
+**Phase 4** (parallel):
+- 3 Card settlements
+
+### Increase API Calls (Banking)
+
+**Account Management:**
+- `accounts.retrieve()` - Get account with balance
+- `accountNumbers.list()` / `accountNumbers.create()` - Manage account numbers
+- `lockboxes.list()` / `lockboxes.create()` - Manage lockboxes
+- `transactions.list()` - List transactions
+- `cards.list()` / `cards.create()` - Manage cards
+
+**Simulations:**
+- `simulations.inboundWireTransfers.create()` - Simulate receiving wire
+- `simulations.inboundACHTransfers.create()` - Simulate receiving ACH
+- `simulations.inboundMailItems.create()` - Simulate check to lockbox
+- `simulations.inboundCheckDeposits.create()` - Simulate check deposit
+- `simulations.cardAuthorizations.create()` - Simulate card purchase
+- `simulations.cardSettlements.create()` - Settle card authorization
+
+### UI Conventions
+
+- **Simulation buttons**: Violet color with ✨ emoji (magical demo actions)
+- **Product buttons**: Blue color with ↻ for Roll buttons (hypothetical product features)
+- **Money display**: `$${(cents / 100).toLocaleString()}` with green/red for positive/negative
+- **Cards**: `shadow="sm" padding="lg" radius="md" withBorder`
+
 ## Demo Session Setup
 
 On start, automatically creates:
 1. Corporation Entity (demo data)
 2. Account linked to Entity
-3. External Account (funding source for bill payments)
+3. Product-specific resources:
+   - **Bill Pay**: External Account (funding source)
+   - **Banking**: Account Number, Lockbox, 3 Cards, and demo transactions (see Banking Product section)
 
 ## Environment Variables
 
