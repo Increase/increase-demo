@@ -18,7 +18,7 @@ app.use('/api', createProxyMiddleware({
 app.use(express.static(join(__dirname, 'dist')));
 
 // Handle client-side routing - serve index.html for all other routes
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
