@@ -232,26 +232,36 @@ export async function setupDemoSession(
 
     // Card authorizations in parallel
     const authResults = await Promise.all(
-      cards.map((card, i) =>
-        loggedRequest(logFn, 'POST', 'simulations/card_authorizations', () =>
-          client.simulations.cardAuthorizations.create({
-            card_id: card.id,
-            amount: cardData[i].amount,
-            merchant_descriptor: cardData[i].merchant,
-            merchant_category_code: '5999',
-          })
-        )
-      )
+      cards.map(async (card, i) => {
+        const authResponse = await client.simulations.cardAuthorizations.create({
+          card_id: card.id,
+          amount: cardData[i].amount,
+          merchant_descriptor: cardData[i].merchant,
+          merchant_category_code: '5999',
+        });
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'POST',
+          path: 'simulations/card_authorizations',
+          status: 200,
+          resourceType: 'simulations',
+          timestamp: new Date(),
+        });
+        return authResponse;
+      })
     );
 
     // Phase 4: Settle card authorizations in parallel
     await Promise.all(
       authResults.map((authResult, i) => {
-        if (authResult.pending_transaction) {
+        const pendingTxnId = 'pending_transaction' in authResult
+          ? (authResult as { pending_transaction?: { id: string } }).pending_transaction?.id
+          : undefined;
+        if (pendingTxnId) {
           return loggedRequest(logFn, 'POST', 'simulations/card_settlements', () =>
             client.simulations.cardSettlements.create({
               card_id: cards[i].id,
-              pending_transaction_id: authResult.pending_transaction!.id,
+              pending_transaction_id: pendingTxnId,
             })
           );
         }

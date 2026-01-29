@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Text, Button, Badge } from '@mantine/core';
+import { Card, Text, Button } from '@mantine/core';
 import { useBanking } from '../context/BankingContext';
 import { useApiLog } from '../context/ApiLogContext';
 import type { DemoSession } from '../types';
@@ -22,7 +22,7 @@ function formatDate(dateString: string): string {
   });
 }
 
-export function LockboxDetail({ session, onBack, onRefresh }: LockboxDetailProps) {
+export function LockboxDetail({ session, onBack }: LockboxDetailProps) {
   const { lockboxes, transactions, rollLockbox } = useBanking();
   const { addRequest } = useApiLog();
   const [isRolling, setIsRolling] = useState(false);
@@ -70,12 +70,6 @@ export function LockboxDetail({ session, onBack, onRefresh }: LockboxDetailProps
             </Text>
           </div>
           <div className="flex items-center gap-2">
-            <Badge
-              variant="light"
-              color={primaryLockbox.status === 'active' ? 'green' : 'gray'}
-            >
-              {primaryLockbox.status}
-            </Badge>
             <Button
               color="blue"
               size="xs"
@@ -90,7 +84,7 @@ export function LockboxDetail({ session, onBack, onRefresh }: LockboxDetailProps
         <div className="flex flex-col gap-3">
           <div>
             <Text size="sm" c="dimmed">Mailing Address</Text>
-            <Text>{primaryLockbox.address?.recipient_name}</Text>
+            <Text>{primaryLockbox.description || 'Primary Lockbox'}</Text>
             <Text>{primaryLockbox.address?.line1}</Text>
             {primaryLockbox.address?.line2 && (
               <Text>{primaryLockbox.address.line2}</Text>

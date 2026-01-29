@@ -149,7 +149,7 @@ export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverv
             </div>
             {primaryLockbox ? (
               <div className="flex flex-col">
-                <Text size="sm">{primaryLockbox.address?.recipient_name}</Text>
+                <Text size="sm">{primaryLockbox.description || 'Primary Lockbox'}</Text>
                 <Text size="sm" c="dimmed">{primaryLockbox.address?.line1}</Text>
                 {primaryLockbox.address?.line2 && (
                   <Text size="sm" c="dimmed">{primaryLockbox.address.line2}</Text>
