@@ -64,9 +64,9 @@ describe('Bill Pay Flow', () => {
 
     // Wait for dropdown and select the option
     await waitFor(() => {
-      expect(screen.getByText(/vendor payment account/i)).toBeInTheDocument();
+      expect(screen.getByText(/customer external account/i)).toBeInTheDocument();
     });
-    await user.click(screen.getByText(/vendor payment account/i));
+    await user.click(screen.getByText(/customer external account/i));
 
     // Enter amount
     const amountLabel = screen.getByText('Amount ($)');

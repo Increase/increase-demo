@@ -136,7 +136,7 @@ export async function setupDemoSession(
         client.externalAccounts.create({
           account_number: '987654321',
           routing_number: '101050001',
-          description: 'Vendor Payment Account',
+          description: 'Customer External Account (Chase Bank)',
           account_holder: 'business',
           funding: 'checking',
         })

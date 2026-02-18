@@ -179,7 +179,7 @@ export const bankingHandlers = [
     return HttpResponse.json({
       id: nextId('external_account'),
       type: 'external_account',
-      description: 'Vendor Payment Account',
+      description: 'Customer External Account (Chase Bank)',
       routing_number: '101050001',
       account_number: '987654321',
       status: 'active',
