@@ -29,6 +29,7 @@ function getDashboardPath(resourceType: string, id: string): string | null {
     inbound_ach_transfers: 'inbound_ach_transfers',
     inbound_wire_transfers: 'inbound_wire_transfers',
     inbound_check_deposits: 'inbound_check_deposits',
+    entity_onboarding_sessions: 'entity_onboarding_sessions',
     simulations: null,
   };
   const dashboardType = typeMap[resourceType];
