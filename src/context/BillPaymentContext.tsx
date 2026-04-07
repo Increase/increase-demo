@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { BillPayment, PaymentDetails, ApiRequest } from '../types';
+import type { BillPayment, PaymentDetails, FundingMethod, ApiRequest } from '../types';
 import { createIncreaseClient } from '../lib/increase';
 
 interface BillPaymentContextType {
@@ -7,8 +7,10 @@ interface BillPaymentContextType {
   createPayment: (
     apiKey: string,
     accountId: string,
+    accountNumberId: string,
     externalAccountId: string,
     amount: number,
+    fundingMethod: FundingMethod,
     paymentDetails: PaymentDetails,
     logFn: (req: ApiRequest) => void
   ) => Promise<BillPayment>;
@@ -46,8 +48,10 @@ export function BillPaymentProvider({ children }: { children: ReactNode }) {
     async (
       apiKey: string,
       accountId: string,
+      accountNumberId: string,
       externalAccountId: string,
       amount: number,
+      fundingMethod: FundingMethod,
       paymentDetails: PaymentDetails,
       logFn: (req: ApiRequest) => void
     ): Promise<BillPayment> => {
@@ -59,6 +63,7 @@ export function BillPaymentProvider({ children }: { children: ReactNode }) {
         createdAt: new Date(),
         amount,
         status: 'pending_debit',
+        fundingMethod,
         externalAccountId,
         paymentDetails,
       };
@@ -66,34 +71,92 @@ export function BillPaymentProvider({ children }: { children: ReactNode }) {
       setPayments((prev) => [...prev, payment]);
 
       try {
-        // Only create the debit leg - credit leg comes after settlement
-        // Negative amount with external_account_id pulls FROM the external account
-        const debitTransfer = await client.achTransfers.create({
-          account_id: accountId,
-          amount: -amount,
-          external_account_id: externalAccountId,
-          statement_descriptor: 'Bill Payment Debit',
-        });
+        if (fundingMethod === 'wire_drawdown') {
+          // Create a Wire Drawdown Request asking the external party to send funds
+          const drawdownRequest = await client.wireDrawdownRequests.create({
+            account_number_id: accountNumberId,
+            amount,
+            creditor_name: 'Bill Pay Account',
+            creditor_address: {
+              line1: '123 Main St',
+              city: 'San Francisco',
+              state: 'CA',
+              postal_code: '94102',
+              country: 'US',
+            },
+            debtor_name: 'External Account Holder',
+            debtor_address: {
+              line1: '456 Oak Ave',
+              city: 'New York',
+              state: 'NY',
+              postal_code: '10001',
+              country: 'US',
+            },
+            debtor_external_account_id: externalAccountId,
+            unstructured_remittance_information: 'Bill Payment Funding',
+          });
 
-        logFn({
-          id: crypto.randomUUID(),
-          method: 'POST',
-          path: 'ach_transfers',
-          status: 200,
-          resourceType: 'ach_transfers',
-          resourceId: debitTransfer.id,
-          timestamp: new Date(),
-        });
+          logFn({
+            id: crypto.randomUUID(),
+            method: 'POST',
+            path: 'wire_drawdown_requests',
+            status: 200,
+            resourceType: 'wire_drawdown_requests',
+            resourceId: drawdownRequest.id,
+            timestamp: new Date(),
+          });
 
-        setPayments((prev) =>
-          prev.map((p) =>
-            p.id === paymentId
-              ? { ...p, status: 'debit_processing', debitTransferId: debitTransfer.id }
-              : p
-          )
-        );
+          // Immediately simulate submission
+          await client.simulations.wireDrawdownRequests.submit(drawdownRequest.id);
 
-        return { ...payment, status: 'debit_processing', debitTransferId: debitTransfer.id };
+          logFn({
+            id: crypto.randomUUID(),
+            method: 'POST',
+            path: `simulations/wire_drawdown_requests/${drawdownRequest.id}/submit`,
+            status: 200,
+            resourceType: 'simulations',
+            resourceId: drawdownRequest.id,
+            timestamp: new Date(),
+          });
+
+          setPayments((prev) =>
+            prev.map((p) =>
+              p.id === paymentId
+                ? { ...p, status: 'debit_processing', wireDrawdownRequestId: drawdownRequest.id }
+                : p
+            )
+          );
+
+          return { ...payment, status: 'debit_processing', wireDrawdownRequestId: drawdownRequest.id };
+        } else {
+          // ACH Debit: Negative amount with external_account_id pulls FROM the external account
+          const debitTransfer = await client.achTransfers.create({
+            account_id: accountId,
+            amount: -amount,
+            external_account_id: externalAccountId,
+            statement_descriptor: 'Bill Payment Debit',
+          });
+
+          logFn({
+            id: crypto.randomUUID(),
+            method: 'POST',
+            path: 'ach_transfers',
+            status: 200,
+            resourceType: 'ach_transfers',
+            resourceId: debitTransfer.id,
+            timestamp: new Date(),
+          });
+
+          setPayments((prev) =>
+            prev.map((p) =>
+              p.id === paymentId
+                ? { ...p, status: 'debit_processing', debitTransferId: debitTransfer.id }
+                : p
+            )
+          );
+
+          return { ...payment, status: 'debit_processing', debitTransferId: debitTransfer.id };
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setPayments((prev) =>
@@ -101,16 +164,6 @@ export function BillPaymentProvider({ children }: { children: ReactNode }) {
             p.id === paymentId ? { ...p, status: 'failed', error: errorMessage } : p
           )
         );
-
-        logFn({
-          id: crypto.randomUUID(),
-          method: 'POST',
-          path: 'ach_transfers',
-          status: 500,
-          resourceType: 'ach_transfers',
-          timestamp: new Date(),
-        });
-
         throw error;
       }
     },
@@ -127,23 +180,54 @@ export function BillPaymentProvider({ children }: { children: ReactNode }) {
       const client = createIncreaseClient(apiKey);
       const payment = payments.find((p) => p.id === paymentId);
 
-      if (!payment || !payment.debitTransferId) {
-        throw new Error('Payment not found or debit not created');
+      if (!payment) {
+        throw new Error('Payment not found');
       }
 
       try {
-        // Step 1: Simulate settling the ACH debit transfer
-        await client.simulations.achTransfers.settle(payment.debitTransferId, {});
+        // Step 1: Settle the funding leg
+        if (payment.fundingMethod === 'wire_drawdown') {
+          if (!payment.wireDrawdownRequestId) {
+            throw new Error('Wire drawdown request not created');
+          }
+          // Simulate an inbound wire transfer fulfilling the drawdown request
+          // Need an account number - use the first one from the account
+          const accountNumbers = await client.accountNumbers.list({ account_id: accountId });
+          const accountNumberId = accountNumbers.data[0]?.id;
+          if (!accountNumberId) throw new Error('No account number available');
 
-        logFn({
-          id: crypto.randomUUID(),
-          method: 'POST',
-          path: `simulations/ach_transfers/${payment.debitTransferId}/settle`,
-          status: 200,
-          resourceType: 'simulations',
-          resourceId: payment.debitTransferId,
-          timestamp: new Date(),
-        });
+          const inboundWire = await client.simulations.inboundWireTransfers.create({
+            account_number_id: accountNumberId,
+            amount: payment.amount,
+            wire_drawdown_request_id: payment.wireDrawdownRequestId,
+          });
+
+          logFn({
+            id: crypto.randomUUID(),
+            method: 'POST',
+            path: 'simulations/inbound_wire_transfers',
+            status: 200,
+            resourceType: 'inbound_wire_transfers',
+            resourceId: inboundWire.id,
+            timestamp: new Date(),
+          });
+        } else {
+          if (!payment.debitTransferId) {
+            throw new Error('Debit transfer not created');
+          }
+          // Settle the ACH debit transfer
+          await client.simulations.achTransfers.settle(payment.debitTransferId, {});
+
+          logFn({
+            id: crypto.randomUUID(),
+            method: 'POST',
+            path: `simulations/ach_transfers/${payment.debitTransferId}/settle`,
+            status: 200,
+            resourceType: 'simulations',
+            resourceId: payment.debitTransferId,
+            timestamp: new Date(),
+          });
+        }
 
         setPayments((prev) =>
           prev.map((p) =>

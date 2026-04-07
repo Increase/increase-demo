@@ -9,6 +9,22 @@ let idCounter = 0;
 const nextId = (prefix: string) => `${prefix}_test_${++idCounter}`;
 
 // Store for tracking state across handlers
+interface PendingTransaction {
+  id: string;
+  account_id: string;
+  amount: number;
+  held_amount: number;
+  description: string;
+  created_at: string;
+  status: string;
+  route_id: string | null;
+  route_type: string | null;
+  source: {
+    category: string;
+    [key: string]: unknown;
+  };
+}
+
 interface BankingState {
   entityId: string | null;
   accountId: string | null;
@@ -17,6 +33,7 @@ interface BankingState {
   cardIds: string[];
   achTransferId: string | null;
   pendingTransactionIds: string[];
+  pendingTransactions: PendingTransaction[];
   transactions: Transaction[];
   cards: Card[];
   accountNumbers: AccountNumber[];
@@ -81,6 +98,7 @@ const state: BankingState = {
   cardIds: [],
   achTransferId: null,
   pendingTransactionIds: [],
+  pendingTransactions: [],
   transactions: [],
   cards: [],
   accountNumbers: [],
@@ -90,6 +108,9 @@ const state: BankingState = {
 // Track pending check deposits from mail items
 const pendingCheckDeposits = new Map<string, { amount: number; lockbox_id: string }>();
 
+// Generic transfer store for retrieve endpoints
+const transfers = new Map<string, Record<string, unknown>>();
+
 export function resetBankingState() {
   state.entityId = null;
   state.accountId = null;
@@ -98,11 +119,13 @@ export function resetBankingState() {
   state.cardIds = [];
   state.achTransferId = null;
   state.pendingTransactionIds = [];
+  state.pendingTransactions = [];
   state.transactions = [];
   state.cards = [];
   state.accountNumbers = [];
   state.lockboxes = [];
   pendingCheckDeposits.clear();
+  transfers.clear();
   idCounter = 0;
 }
 
@@ -384,17 +407,39 @@ export const bankingHandlers = [
     };
     state.achTransferId = nextId('ach_transfer');
     const pendingTxnId = nextId('pending_transaction');
-    return HttpResponse.json({
+    const amount = body.amount || 0;
+
+    state.pendingTransactions.unshift({
+      id: pendingTxnId,
+      account_id: body.account_id || state.accountId || 'account_test_1',
+      amount: -Math.abs(amount),
+      held_amount: -Math.abs(amount),
+      description: body.statement_descriptor || 'ACH Transfer',
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      route_id: null,
+      route_type: null,
+      source: {
+        category: 'ach_transfer_instruction',
+        ach_transfer_instruction: { transfer_id: state.achTransferId },
+      },
+    });
+
+    const achTransfer = {
       type: 'ach_transfer',
       id: state.achTransferId,
       account_id: body.account_id || state.accountId,
-      amount: body.amount || 0,
+      amount,
       status: 'pending_submission',
       statement_descriptor: body.statement_descriptor || 'Transfer',
+      routing_number: (body as Record<string, unknown>).routing_number || '101050001',
+      account_number: (body as Record<string, unknown>).account_number || '987654321',
       created_at: new Date().toISOString(),
       pending_transaction_id: pendingTxnId,
       transaction_id: null,
-    });
+    };
+    transfers.set(state.achTransferId!, achTransfer);
+    return HttpResponse.json(achTransfer);
   }),
 
   // Submit ACH Transfer
@@ -415,8 +460,10 @@ export const bankingHandlers = [
   // Settle ACH Transfer
   http.post('*/simulations/ach_transfers/:id/settle', async ({ params, request }) => {
     const body = (await request.json()) as { amount?: number };
-    // Find the ACH amount to create transaction
-    const amount = body.amount || 120000;
+    const stored = transfers.get(params.id as string);
+    const amount = body.amount || (stored?.amount as number) || 120000;
+    // Update stored transfer status
+    if (stored) stored.status = 'returned';
     const txnId = nextId('transaction');
     state.transactions.unshift({
       id: txnId,
@@ -469,7 +516,7 @@ export const bankingHandlers = [
       },
     });
 
-    return HttpResponse.json({
+    const inboundWire = {
       type: 'inbound_wire_transfer',
       id: wireId,
       amount,
@@ -478,7 +525,9 @@ export const bankingHandlers = [
       status: 'accepted',
       created_at: new Date().toISOString(),
       description: 'Test wire transfer',
-    });
+    };
+    transfers.set(wireId, inboundWire);
+    return HttpResponse.json(inboundWire);
   }),
 
   // Simulate Inbound Mail Items (lockbox check)
@@ -540,13 +589,16 @@ export const bankingHandlers = [
       },
     });
 
-    return HttpResponse.json({
+    const checkDeposit = {
       type: 'check_deposit',
       id: checkDepositId,
       status: 'submitted',
       amount,
       transaction_id: txnId,
-    });
+      created_at: new Date().toISOString(),
+    };
+    transfers.set(checkDepositId, checkDeposit);
+    return HttpResponse.json(checkDeposit);
   }),
 
   // Simulate Inbound ACH Transfer
@@ -572,13 +624,17 @@ export const bankingHandlers = [
       },
     });
 
-    return HttpResponse.json({
+    const inboundAch = {
       type: 'inbound_ach_transfer',
       id: achId,
       amount,
       status: 'accepted',
+      company_name: 'External Company',
       account_number_id: body.account_number_id || state.accountNumberId,
-    });
+      created_at: new Date().toISOString(),
+    };
+    transfers.set(achId, inboundAch);
+    return HttpResponse.json(inboundAch);
   }),
 
   // Simulate Inbound Check Deposit
@@ -603,6 +659,18 @@ export const bankingHandlers = [
     state.pendingTransactionIds.push(pendingTxnId);
     const cardAuthId = nextId('card_authorization');
     const cardPaymentId = nextId('card_payment');
+
+    // Store card payment for retrieve
+    transfers.set(cardPaymentId, {
+      type: 'card_payment',
+      id: cardPaymentId,
+      card_id: body.card_id,
+      created_at: new Date().toISOString(),
+      state: {
+        authorized_amount: body.amount || 0,
+        settled_amount: 0,
+      },
+    });
 
     return HttpResponse.json({
       type: 'inbound_card_authorization_simulation_result',
@@ -690,6 +758,21 @@ export const bankingHandlers = [
     });
   }),
 
+  // List Pending Transactions
+  http.get('*/pending_transactions', async () => {
+    return HttpResponse.json({
+      data: state.pendingTransactions
+        .filter((pt) => pt.status === 'pending')
+        .map((pt) => ({
+          type: 'pending_transaction',
+          ...pt,
+          currency: 'USD',
+          completed_at: null,
+          date: pt.created_at.split('T')[0],
+        })),
+    });
+  }),
+
   // List Transactions
   http.get('*/transactions', async () => {
     return HttpResponse.json({
@@ -702,18 +785,44 @@ export const bankingHandlers = [
     });
   }),
 
-  // Wire Transfer handlers (for bill pay)
+  // Wire Transfer handlers
   http.post('*/wire_transfers', async ({ request }) => {
-    const body = (await request.json()) as { amount?: number };
-    return HttpResponse.json({
-      id: nextId('wire_transfer'),
-      type: 'wire_transfer',
-      amount: body.amount,
-      status: 'pending_approval',
+    const body = (await request.json()) as { account_id?: string; amount?: number };
+    const wireId = nextId('wire_transfer');
+    const pendingTxnId = nextId('pending_transaction');
+    const amount = body.amount || 0;
+
+    state.pendingTransactions.unshift({
+      id: pendingTxnId,
+      account_id: body.account_id || state.accountId || 'account_test_1',
+      amount: -Math.abs(amount),
+      held_amount: -Math.abs(amount),
+      description: 'Wire transfer',
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      route_id: null,
+      route_type: null,
+      source: {
+        category: 'wire_transfer_instruction',
+        wire_transfer_instruction: { transfer_id: wireId },
+      },
     });
+
+    const wireTransfer = {
+      id: wireId,
+      type: 'wire_transfer',
+      amount,
+      status: 'pending_approval',
+      pending_transaction_id: pendingTxnId,
+      created_at: new Date().toISOString(),
+    };
+    transfers.set(wireId, wireTransfer);
+    return HttpResponse.json(wireTransfer);
   }),
 
   http.post('*/simulations/wire_transfers/:id/submit', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) stored.status = 'complete';
     return HttpResponse.json({
       id: params.id,
       type: 'wire_transfer',
@@ -721,18 +830,46 @@ export const bankingHandlers = [
     });
   }),
 
-  // RTP handlers (for bill pay)
+  // RTP handlers
   http.post('*/real_time_payments_transfers', async ({ request }) => {
     const body = (await request.json()) as { amount?: number };
-    return HttpResponse.json({
-      id: nextId('rtp_transfer'),
-      type: 'real_time_payments_transfer',
-      amount: body.amount,
-      status: 'pending_submission',
+    const rtpId = nextId('rtp_transfer');
+    const pendingTxnId = nextId('pending_transaction');
+    const amount = body.amount || 0;
+
+    state.pendingTransactions.unshift({
+      id: pendingTxnId,
+      account_id: state.accountId || 'account_test_1',
+      amount: -Math.abs(amount),
+      held_amount: -Math.abs(amount),
+      description: 'RTP transfer',
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      route_id: null,
+      route_type: null,
+      source: {
+        category: 'real_time_payments_transfer_instruction',
+        real_time_payments_transfer_instruction: { transfer_id: rtpId },
+      },
     });
+
+    const rtpTransfer = {
+      id: rtpId,
+      type: 'real_time_payments_transfer',
+      amount,
+      status: 'pending_submission',
+      creditor_name: 'Recipient',
+      remittance_information: 'Transfer',
+      pending_transaction_id: pendingTxnId,
+      created_at: new Date().toISOString(),
+    };
+    transfers.set(rtpId, rtpTransfer);
+    return HttpResponse.json(rtpTransfer);
   }),
 
   http.post('*/simulations/real_time_payments_transfers/:id/complete', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) stored.status = 'complete';
     return HttpResponse.json({
       id: params.id,
       type: 'real_time_payments_transfer',
@@ -740,23 +877,127 @@ export const bankingHandlers = [
     });
   }),
 
-  // Check Transfer handlers (for bill pay)
+  // Check Transfer handlers
   http.post('*/check_transfers', async ({ request }) => {
-    const body = (await request.json()) as { amount?: number };
-    return HttpResponse.json({
-      id: nextId('check_transfer'),
+    const body = (await request.json()) as { account_id?: string; amount?: number };
+    const checkId = nextId('check_transfer');
+    const pendingTxnId = nextId('pending_transaction');
+    const amount = body.amount || 0;
+
+    state.pendingTransactions.unshift({
+      id: pendingTxnId,
+      account_id: body.account_id || state.accountId || 'account_test_1',
+      amount: -Math.abs(amount),
+      held_amount: -Math.abs(amount),
+      description: 'Check transfer',
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      route_id: null,
+      route_type: null,
+      source: {
+        category: 'check_transfer_instruction',
+        check_transfer_instruction: { transfer_id: checkId },
+      },
+    });
+
+    const checkTransfer = {
+      id: checkId,
       type: 'check_transfer',
-      amount: body.amount,
+      amount,
       status: 'pending_approval',
       check_number: '00001234',
-    });
+      pending_transaction_id: pendingTxnId,
+      created_at: new Date().toISOString(),
+    };
+    transfers.set(checkId, checkTransfer);
+    return HttpResponse.json(checkTransfer);
   }),
 
   http.post('*/simulations/check_transfers/:id/mail', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) stored.status = 'mailed';
     return HttpResponse.json({
       id: params.id,
       type: 'check_transfer',
       status: 'mailed',
+    });
+  }),
+
+  // Also store inbound transfers for retrieve
+  // (inbound wire transfers are already created in the simulation handler above)
+
+  // Generic transfer retrieve handler
+  http.get('*/ach_transfers/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'ach_transfer', status: 'returned', amount: 0, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/wire_transfers/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'wire_transfer', status: 'complete', amount: 0, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/real_time_payments_transfers/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'real_time_payments_transfer', status: 'complete', amount: 0, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/check_transfers/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'check_transfer', status: 'mailed', amount: 0, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/card_payments/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'card_payment', card_id: 'card_test_1', state: { authorized_amount: 0, settled_amount: 0 }, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/check_deposits/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'check_deposit', status: 'accepted', amount: 0, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/inbound_ach_transfers/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'inbound_ach_transfer', status: 'accepted', amount: 0, created_at: new Date().toISOString() });
+  }),
+
+  http.get('*/inbound_wire_transfers/:id', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) return HttpResponse.json(stored);
+    return HttpResponse.json({ id: params.id, type: 'inbound_wire_transfer', status: 'accepted', amount: 0, description: 'Wire transfer', created_at: new Date().toISOString() });
+  }),
+
+  // Wire Drawdown Request handlers
+  http.post('*/wire_drawdown_requests', async ({ request }) => {
+    const body = (await request.json()) as { amount?: number };
+    const drawdownId = nextId('wire_drawdown_request');
+    const drawdown = {
+      type: 'wire_drawdown_request',
+      id: drawdownId,
+      amount: body.amount || 0,
+      status: 'pending_submission',
+      created_at: new Date().toISOString(),
+      fulfillment_inbound_wire_transfer_id: null,
+    };
+    transfers.set(drawdownId, drawdown);
+    return HttpResponse.json(drawdown);
+  }),
+
+  http.post('*/simulations/wire_drawdown_requests/:id/submit', async ({ params }) => {
+    const stored = transfers.get(params.id as string);
+    if (stored) stored.status = 'pending_response';
+    return HttpResponse.json({
+      id: params.id,
+      type: 'wire_drawdown_request',
+      status: 'pending_response',
     });
   }),
 ];

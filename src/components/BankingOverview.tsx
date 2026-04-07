@@ -3,6 +3,8 @@ import { Card, Text, Button, Menu, Badge, CopyButton, ActionIcon, Tooltip } from
 import { useBanking } from '../context/BankingContext';
 import { useApiLog } from '../context/ApiLogContext';
 import { SimulateInboundModal } from './SimulateInboundModal';
+import { MoveMoneyModal } from './MoveMoneyModal';
+import { getTransferFromSource } from '../types';
 import type { DemoSession, BankingViewState, InboundTransferType } from '../types';
 
 interface BankingOverviewProps {
@@ -24,10 +26,11 @@ function formatDate(dateString: string): string {
 }
 
 export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverviewProps) {
-  const { account, balance, accountNumbers, lockboxes, transactions, cards, rollAccountNumber, rollLockbox } = useBanking();
+  const { account, balance, accountNumbers, lockboxes, pendingTransactions, transactions, cards, rollAccountNumber, rollLockbox } = useBanking();
   const { addRequest } = useApiLog();
   const [simulateModalOpen, setSimulateModalOpen] = useState(false);
   const [simulateType, setSimulateType] = useState<InboundTransferType>('wire');
+  const [moveMoneyModalOpen, setMoveMoneyModalOpen] = useState(false);
   const [isRollingAccountNumber, setIsRollingAccountNumber] = useState(false);
   const [isRollingLockbox, setIsRollingLockbox] = useState(false);
 
@@ -195,36 +198,80 @@ export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverv
         </div>
       </Card>
 
+      {/* Pending Transactions */}
+      {pendingTransactions.length > 0 && (
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Text fw={600} mb="sm">Pending Transactions</Text>
+          <div className="flex flex-col gap-2">
+            {pendingTransactions.map((txn) => {
+              const transferInfo = getTransferFromSource(txn.source as Record<string, unknown>);
+              return (
+              <div
+                key={txn.id}
+                className={`flex justify-between items-center p-2 rounded bg-yellow-50${transferInfo ? ' cursor-pointer hover:bg-yellow-100' : ''}`}
+                onClick={transferInfo ? () => onNavigate({ view: 'transfer_detail', transferType: transferInfo.type, transferId: transferInfo.id }) : undefined}
+              >
+                <div className="flex flex-col">
+                  <Text size="sm" fw={500}>{txn.description}</Text>
+                  <Text size="xs" c="dimmed">{formatDate(txn.created_at)}</Text>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Text
+                    size="sm"
+                    fw={600}
+                    c={txn.amount >= 0 ? 'green' : 'red'}
+                    ff="monospace"
+                  >
+                    {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
+                  </Text>
+                  <Badge variant="light" color="yellow" size="xs">
+                    pending
+                  </Badge>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* Recent Transactions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <div className="flex justify-between items-center mb-3">
           <Text fw={600}>Recent Transactions</Text>
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <Button color="violet" size="xs" leftSection="✨">
-                Simulate Receiving
-              </Button>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item onClick={() => handleSimulate('wire')}>
-                Wire Transfer
-              </Menu.Item>
-              <Menu.Item onClick={() => handleSimulate('ach')}>
-                ACH Transfer
-              </Menu.Item>
-              <Menu.Item onClick={() => handleSimulate('check')}>
-                Check Deposit
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <div className="flex gap-2">
+            <Button size="xs" onClick={() => setMoveMoneyModalOpen(true)}>
+              Move Money
+            </Button>
+            <Menu shadow="md" width={200}>
+              <Menu.Target>
+                <Button color="violet" size="xs" leftSection="✨">
+                  Simulate Receiving
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => handleSimulate('wire')}>
+                  Wire Transfer
+                </Menu.Item>
+                <Menu.Item onClick={() => handleSimulate('ach')}>
+                  ACH Transfer
+                </Menu.Item>
+                <Menu.Item onClick={() => handleSimulate('check')}>
+                  Check Deposit
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </div>
         </div>
         {recentTransactions.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {recentTransactions.map((txn) => (
+            {recentTransactions.map((txn) => {
+              const transferInfo = getTransferFromSource(txn.source as Record<string, unknown>);
+              return (
               <div
                 key={txn.id}
-                className="flex justify-between items-center p-2 rounded hover:bg-gray-50 cursor-pointer"
-                onClick={() => onNavigate({ view: 'transaction_detail', transactionId: txn.id })}
+                className={`flex justify-between items-center p-2 rounded${transferInfo ? ' hover:bg-gray-50 cursor-pointer' : ''}`}
+                onClick={transferInfo ? () => onNavigate({ view: 'transfer_detail', transferType: transferInfo.type, transferId: transferInfo.id }) : undefined}
               >
                 <div className="flex flex-col">
                   <Text size="sm" fw={500}>{txn.description}</Text>
@@ -244,7 +291,8 @@ export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverv
                   </Badge>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <Text c="dimmed" size="sm">No transactions yet</Text>
@@ -256,6 +304,14 @@ export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverv
         opened={simulateModalOpen}
         onClose={() => setSimulateModalOpen(false)}
         type={simulateType}
+        session={session}
+        onSuccess={onRefresh}
+      />
+
+      {/* Move Money Modal */}
+      <MoveMoneyModal
+        opened={moveMoneyModalOpen}
+        onClose={() => setMoveMoneyModalOpen(false)}
         session={session}
         onSuccess={onRefresh}
       />

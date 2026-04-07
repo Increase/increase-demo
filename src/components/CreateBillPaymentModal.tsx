@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal, Button, TextInput, NumberInput, Select, Radio, Group, Text } from '@mantine/core';
-import type { PaymentNetwork, PaymentDetails } from '../types';
+import type { PaymentNetwork, PaymentDetails, FundingMethod } from '../types';
 import type Increase from 'increase';
 
 export interface PrefillData {
@@ -14,7 +14,7 @@ export interface PrefillData {
 interface CreateBillPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (externalAccountId: string, amount: number, paymentDetails: PaymentDetails) => Promise<void>;
+  onSubmit: (externalAccountId: string, amount: number, fundingMethod: FundingMethod, paymentDetails: PaymentDetails) => Promise<void>;
   externalAccounts: Increase.ExternalAccount[];
   prefillData?: PrefillData;
 }
@@ -44,6 +44,7 @@ export function CreateBillPaymentModal({
 }: CreateBillPaymentModalProps) {
   const [externalAccountId, setExternalAccountId] = useState<string | null>(null);
   const [amount, setAmount] = useState<string | number>('');
+  const [fundingMethod, setFundingMethod] = useState<FundingMethod>('ach_debit');
   const [network, setNetwork] = useState<PaymentNetwork>('ach');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +124,7 @@ export function CreateBillPaymentModal({
   const resetForm = () => {
     setExternalAccountId(null);
     setAmount('');
+    setFundingMethod('ach_debit');
     setNetwork('ach');
     setAccountNumber('');
     setRoutingNumber('');
@@ -190,7 +192,7 @@ export function CreateBillPaymentModal({
     setError(null);
 
     try {
-      await onSubmit(externalAccountId, amountCents, paymentDetails);
+      await onSubmit(externalAccountId, amountCents, fundingMethod, paymentDetails);
       resetForm();
       onClose();
     } catch (err) {
@@ -233,6 +235,18 @@ export function CreateBillPaymentModal({
           decimalScale={2}
           min={0}
         />
+
+        {/* Funding Method */}
+        <Radio.Group
+          label="Funding Method"
+          value={fundingMethod}
+          onChange={(val) => setFundingMethod(val as FundingMethod)}
+        >
+          <Group mt="xs">
+            <Radio value="ach_debit" label="ACH Debit" disabled={isLoading} />
+            <Radio value="wire_drawdown" label="Wire Drawdown Request" disabled={isLoading} />
+          </Group>
+        </Radio.Group>
 
         {/* Payment Network */}
         <Radio.Group

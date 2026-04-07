@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Title, Text, Button } from '@mantine/core';
-import type { DemoSession, PaymentDetails } from '../types';
+import type { DemoSession, PaymentDetails, FundingMethod } from '../types';
 import { useBillPayments } from '../context/BillPaymentContext';
 import { useApiLog } from '../context/ApiLogContext';
 import { BillPaymentList } from './BillPaymentList';
@@ -45,13 +45,16 @@ export function BillPayView({ session }: BillPayViewProps) {
   const handleCreatePayment = async (
     externalAccountId: string,
     amount: number,
+    fundingMethod: FundingMethod,
     paymentDetails: PaymentDetails
   ) => {
     await createPayment(
       session.config.apiKey,
       session.account.id,
+      session.accountNumber?.id || '',
       externalAccountId,
       amount,
+      fundingMethod,
       paymentDetails,
       addRequest
     );

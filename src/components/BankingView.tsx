@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useBanking } from '../context/BankingContext';
 import { useApiLog } from '../context/ApiLogContext';
 import { BankingOverview } from './BankingOverview';
-import { TransactionDetail } from './TransactionDetail';
+import { TransferDetail } from './TransferDetail';
 import { LockboxDetail } from './LockboxDetail';
 import { CardsListView } from './CardsListView';
 import { CardDetail } from './CardDetail';
@@ -14,8 +14,13 @@ interface BankingViewProps {
 
 export function BankingView({ session }: BankingViewProps) {
   const [viewState, setViewState] = useState<BankingViewState>({ view: 'overview' });
-  const { refreshData } = useBanking();
+  const { initializeFromSession, refreshData } = useBanking();
   const { addRequest } = useApiLog();
+
+  // Populate context with session data immediately so lists aren't empty
+  useEffect(() => {
+    initializeFromSession(session);
+  }, [session, initializeFromSession]);
 
   useEffect(() => {
     refreshData(session.config.apiKey, session.account.id, addRequest);
@@ -56,11 +61,14 @@ export function BankingView({ session }: BankingViewProps) {
           onRefresh={handleRefresh}
         />
       );
-    case 'transaction_detail':
+    case 'transfer_detail':
       return (
-        <TransactionDetail
-          transactionId={viewState.transactionId}
+        <TransferDetail
+          transferType={viewState.transferType}
+          transferId={viewState.transferId}
+          session={session}
           onBack={handleBack}
+          onRefresh={handleRefresh}
         />
       );
     case 'lockbox_detail':

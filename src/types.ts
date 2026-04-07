@@ -84,14 +84,18 @@ export interface CardPaymentDetails {
 
 export type PaymentDetails = AchPaymentDetails | RtpPaymentDetails | WirePaymentDetails | CheckPaymentDetails | CardPaymentDetails;
 
+export type FundingMethod = 'ach_debit' | 'wire_drawdown';
+
 export interface BillPayment {
   id: string;
   createdAt: Date;
   amount: number; // in cents
   status: BillPaymentStatus;
+  fundingMethod: FundingMethod;
   externalAccountId: string;
   paymentDetails: PaymentDetails;
   debitTransferId?: string;
+  wireDrawdownRequestId?: string;
   creditTransferId?: string;
   // For check transfers - needed to simulate inbound check deposit
   checkNumber?: string;
@@ -103,11 +107,56 @@ export interface BillPayment {
 }
 
 // Banking Types
+export type TransferDetailType =
+  | 'ach_transfer'
+  | 'wire_transfer'
+  | 'rtp_transfer'
+  | 'check_transfer'
+  | 'card_payment'
+  | 'check_deposit'
+  | 'inbound_ach_transfer'
+  | 'inbound_wire_transfer';
+
 export type BankingViewState =
   | { view: 'overview' }
-  | { view: 'transaction_detail'; transactionId: string }
+  | { view: 'transfer_detail'; transferType: TransferDetailType; transferId: string }
   | { view: 'lockbox_detail' }
   | { view: 'cards_list' }
   | { view: 'card_detail'; cardId: string };
 
 export type InboundTransferType = 'ach' | 'wire' | 'check';
+
+export type OutboundTransferNetwork = 'ach' | 'wire' | 'rtp' | 'check';
+
+/** Maps a transaction or pending transaction source to a transfer type and ID for detail navigation. */
+export function getTransferFromSource(
+  source: Record<string, unknown> | undefined
+): { type: TransferDetailType; id: string } | null {
+  if (!source?.category) return null;
+  const category = source.category as string;
+
+  const mappings: Record<string, { type: TransferDetailType; key: string; idField: string }> = {
+    // Transaction sources
+    ach_transfer_intention: { type: 'ach_transfer', key: 'ach_transfer_intention', idField: 'transfer_id' },
+    wire_transfer_intention: { type: 'wire_transfer', key: 'wire_transfer_intention', idField: 'transfer_id' },
+    card_settlement: { type: 'card_payment', key: 'card_settlement', idField: 'card_payment_id' },
+    check_deposit_acceptance: { type: 'check_deposit', key: 'check_deposit_acceptance', idField: 'check_deposit_id' },
+    inbound_ach_transfer: { type: 'inbound_ach_transfer', key: 'inbound_ach_transfer', idField: 'transfer_id' },
+    inbound_wire_transfer: { type: 'inbound_wire_transfer', key: 'inbound_wire_transfer', idField: 'transfer_id' },
+    // Pending transaction sources
+    ach_transfer_instruction: { type: 'ach_transfer', key: 'ach_transfer_instruction', idField: 'transfer_id' },
+    wire_transfer_instruction: { type: 'wire_transfer', key: 'wire_transfer_instruction', idField: 'transfer_id' },
+    real_time_payments_transfer_instruction: { type: 'rtp_transfer', key: 'real_time_payments_transfer_instruction', idField: 'transfer_id' },
+    check_transfer_instruction: { type: 'check_transfer', key: 'check_transfer_instruction', idField: 'transfer_id' },
+    card_authorization: { type: 'card_payment', key: 'card_authorization', idField: 'card_payment_id' },
+  };
+
+  const mapping = mappings[category];
+  if (!mapping) return null;
+
+  const detail = source[mapping.key] as Record<string, unknown> | undefined;
+  const id = detail?.[mapping.idField] as string | undefined;
+  if (!id) return null;
+
+  return { type: mapping.type, id };
+}

@@ -22,15 +22,17 @@ The Increase API doesn't allow browser CORS requests. Vite's dev server proxies 
 ### State Management
 
 React Context for global state:
-- `ApiLogContext` - Tracks API requests for debug panel
+- `ApiLogContext` - Tracks API requests for debug panel (GET requests are filtered from display)
 - `BillPaymentContext` - Bill payment state and operations
-- `BankingContext` - Banking state (account, transactions, cards, etc.)
+- `BankingContext` - Banking state (account, transactions, pending transactions, cards, etc.) and operations (send transfers, simulate activity, roll account numbers/lockboxes)
+
+The BankingContext uses `initializeFromSession()` to populate state from setup data immediately, then `refreshData()` overlays with fresh API data. `refreshData` uses `Promise.allSettled` so individual API failures don't prevent other data from loading.
 
 ### Layout
 
 Split-screen layout:
 - **Left**: End-user experience
-- **Right**: Debug panel with API requests and "Open in Dashboard" links
+- **Right**: Debug panel with POST API requests and "Open in Dashboard" links
 
 ## Project Structure
 
@@ -38,7 +40,7 @@ Split-screen layout:
 src/
 ├── App.tsx                     # Main app, session state
 ├── main.tsx                    # React entry point, MantineProvider
-├── types.ts                    # TypeScript types
+├── types.ts                    # TypeScript types, getTransferFromSource() utility
 ├── lib/
 │   └── increase.ts             # Increase client, setupDemoSession()
 ├── context/
@@ -48,18 +50,19 @@ src/
 └── components/
     ├── SetupScreen.tsx         # API key & config form
     ├── DemoLayout.tsx          # Split-screen wrapper
-    ├── DebugPanel.tsx          # API requests panel
+    ├── DebugPanel.tsx          # API requests panel (POST only)
     ├── BillPayView.tsx         # Bill Pay main view
     ├── BillPaymentList.tsx     # Payment list
     ├── BillPaymentDetail.tsx   # Payment detail with timeline
     ├── CreateBillPaymentModal.tsx  # New payment modal
     ├── BankingView.tsx         # Banking main view (navigation state)
     ├── BankingOverview.tsx     # Banking overview with account details
-    ├── TransactionDetail.tsx   # Single transaction view
+    ├── TransferDetail.tsx      # Transfer detail with timeline + simulation
     ├── LockboxDetail.tsx       # Lockbox info and transactions
     ├── CardsListView.tsx       # List of cards
     ├── CardDetail.tsx          # Card info and transactions
     ├── CreateCardModal.tsx     # Modal to create new card
+    ├── MoveMoneyModal.tsx      # Modal for outbound transfers (ACH/Wire/RTP/Check)
     └── SimulateInboundModal.tsx # Modal for simulating inbound transfers
 ```
 
@@ -132,14 +135,42 @@ BankingView (manages viewState)
 │   ├── Account Number (with Roll button)
 │   ├── Lockbox address (clickable, with Roll button)
 │   ├── Cards preview (3 cards, View All button)
-│   ├── Recent transactions (clickable)
+│   ├── Pending Transactions (clickable, yellow highlight)
+│   ├── Recent Transactions (clickable)
+│   ├── Move Money button → MoveMoneyModal
 │   └── Simulate Receiving dropdown (Wire/ACH/Check)
-├── TransactionDetail ← click transaction
+├── TransferDetail ← click any pending/settled transaction
+│   (fetches actual transfer object, shows timeline + simulation button)
 ├── LockboxDetail ← click lockbox section
 ├── CardsListView ← click "View All"
 │   └── CreateCardModal
 └── CardDetail ← click card
 ```
+
+### Transfer Detail Pages
+
+Both pending transactions and settled transactions link to a **source detail page** via `getTransferFromSource()`, which maps the transaction/pending transaction source category to a transfer type and ID. The `TransferDetail` component fetches the actual transfer from the API and renders type-specific details:
+
+| Transfer Type | API Retrieve | Simulation | Timeline |
+|---|---|---|---|
+| ACH Transfer | `achTransfers.retrieve()` | Settle (`simulations.achTransfers.settle()`) | Created → Submitted → Settled |
+| Wire Transfer | `wireTransfers.retrieve()` | Submit (`simulations.wireTransfers.submit()`) | Created → Submitted → Complete |
+| RTP Transfer | `realTimePaymentsTransfers.retrieve()` | Complete (`simulations.realTimePaymentsTransfers.complete()`) | Created → Submitted → Complete |
+| Check Transfer | `checkTransfers.retrieve()` | Mail (`simulations.checkTransfers.mail()`) | Created → Pending Mailing → Mailed → Deposited |
+| Card Payment | `cardPayments.retrieve()` | — | Authorized → Settled |
+| Check Deposit | `checkDeposits.retrieve()` | — | Received → Submitted → Accepted |
+| Inbound ACH | `inboundACHTransfers.retrieve()` | — | Received → Accepted |
+| Inbound Wire | `inboundWireTransfers.retrieve()` | — | Received → Accepted |
+
+### Move Money
+
+The Move Money modal supports outbound ACH, Wire, RTP, and Check transfers. Each network type requires different fields:
+- **ACH**: Account number, routing number, statement descriptor
+- **Wire**: Recipient name, account number, routing number, message
+- **RTP**: Recipient name, account number, routing number, remittance info
+- **Check**: Recipient name, full mailing address, memo
+
+An autofill button populates demo data. After creating a transfer, the pending transaction appears in the overview and can be clicked to view the transfer detail and simulate activity.
 
 ### Demo Session Setup (Banking)
 
@@ -156,7 +187,7 @@ Creates resources in parallel phases for speed:
 - Outbound ACH transfer ($1,200) - payroll
 
 **Phase 3** (parallel):
-- ACH submit/settle
+- ACH settle (auto-submits if pending_submission)
 - 3 Card authorizations (UBER EATS $45.23, GOOGLE ADS $750, STAPLES $124.99)
 
 **Phase 4** (parallel):
@@ -165,11 +196,23 @@ Creates resources in parallel phases for speed:
 ### Increase API Calls (Banking)
 
 **Account Management:**
-- `accounts.retrieve()` - Get account with balance
+- `accounts.retrieve()` / `accounts.balance()` - Get account with balance
 - `accountNumbers.list()` / `accountNumbers.create()` - Manage account numbers
 - `lockboxes.list()` / `lockboxes.create()` - Manage lockboxes
+- `pendingTransactions.list()` - List pending transactions
 - `transactions.list()` - List transactions
 - `cards.list()` / `cards.create()` - Manage cards
+
+**Outbound Transfers (Move Money):**
+- `achTransfers.create()` - Send ACH transfer
+- `wireTransfers.create()` - Send wire transfer
+- `realTimePaymentsTransfers.create()` - Send RTP transfer
+- `checkTransfers.create()` - Send check transfer
+
+**Transfer Retrieval (Detail Pages):**
+- `achTransfers.retrieve()`, `wireTransfers.retrieve()`, `realTimePaymentsTransfers.retrieve()`, `checkTransfers.retrieve()` - Outbound transfers
+- `cardPayments.retrieve()`, `checkDeposits.retrieve()` - Card and check activity
+- `inboundACHTransfers.retrieve()`, `inboundWireTransfers.retrieve()` - Inbound transfers
 
 **Simulations:**
 - `simulations.inboundWireTransfers.create()` - Simulate receiving wire
@@ -178,6 +221,10 @@ Creates resources in parallel phases for speed:
 - `simulations.inboundCheckDeposits.create()` - Simulate check deposit
 - `simulations.cardAuthorizations.create()` - Simulate card purchase
 - `simulations.cardSettlements.create()` - Settle card authorization
+- `simulations.achTransfers.settle()` - Settle outbound ACH
+- `simulations.wireTransfers.submit()` - Submit outbound wire
+- `simulations.realTimePaymentsTransfers.complete()` - Complete outbound RTP
+- `simulations.checkTransfers.mail()` - Mail outbound check
 
 ### UI Conventions
 
@@ -218,12 +265,15 @@ pnpm test       # Run tests
 
 Tests use Vitest + React Testing Library with MSW for API mocking. Run `pnpm test` to verify changes work correctly.
 
-**Always run tests after making changes** to ensure nothing is broken. The test suite covers the complete bill pay flow including payment creation and settlement.
+**Always run tests after making changes** to ensure nothing is broken. The test suite covers the bill pay flow and banking demo including session setup, transactions, cards, and simulations.
 
 Test files:
 - `src/test/setup.ts` - Test setup with MSW and jsdom mocks
-- `src/test/mocks/handlers.ts` - MSW handlers for Increase API
+- `src/test/mocks/handlers.ts` - MSW handler index
+- `src/test/mocks/banking-handlers.ts` - MSW handlers for all Increase API endpoints (tracks state across handlers, stores transfers for retrieve)
 - `src/test/bill-pay.test.tsx` - Bill pay flow integration test
+- `src/test/banking.test.tsx` - Banking overview and cards test
+- `src/test/banking-setup.test.tsx` - Full banking session setup, transactions, simulations, cards, account number/lockbox rolling
 
 ## Deployment
 

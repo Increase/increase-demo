@@ -40,19 +40,33 @@ function getTimelineSteps(payment: BillPayment): TimelineStep[] {
   const network = payment.paymentDetails.network;
   const status = payment.status;
 
-  // Debit steps (common to all)
-  const debitSteps: TimelineStep[] = [
-    {
-      label: 'Debit initiated',
-      status: status === 'pending_debit' ? 'current' : 'completed',
-    },
-    {
-      label: 'Debit settled',
-      status: ['pending_debit', 'debit_processing'].includes(status)
-        ? (status === 'debit_processing' ? 'current' : 'pending')
-        : 'completed',
-    },
-  ];
+  // Funding steps depend on funding method
+  const isWireDrawdown = payment.fundingMethod === 'wire_drawdown';
+  const debitSteps: TimelineStep[] = isWireDrawdown
+    ? [
+        {
+          label: 'Drawdown requested',
+          status: status === 'pending_debit' ? 'current' : 'completed',
+        },
+        {
+          label: 'Drawdown fulfilled',
+          status: ['pending_debit', 'debit_processing'].includes(status)
+            ? (status === 'debit_processing' ? 'current' : 'pending')
+            : 'completed',
+        },
+      ]
+    : [
+        {
+          label: 'Debit initiated',
+          status: status === 'pending_debit' ? 'current' : 'completed',
+        },
+        {
+          label: 'Debit settled',
+          status: ['pending_debit', 'debit_processing'].includes(status)
+            ? (status === 'debit_processing' ? 'current' : 'pending')
+            : 'completed',
+        },
+      ];
 
   // Credit steps vary by network
   const getCreditSteps = (): TimelineStep[] => {
@@ -170,7 +184,7 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
     switch (payment.status) {
       case 'debit_processing':
         return {
-          label: 'Settle Debit',
+          label: payment.fundingMethod === 'wire_drawdown' ? 'Fulfill Drawdown' : 'Settle Debit',
           onClick: async () => {
             setIsLoading(true);
             try {
@@ -244,6 +258,10 @@ export function BillPaymentDetail({ payment, onBack, onSettleAndPay, onSettleCre
 
         {/* Payment Details */}
         <div className="flex flex-col gap-2 text-sm">
+          <div className="flex justify-between">
+            <Text c="dimmed">Funding:</Text>
+            <Text>{payment.fundingMethod === 'wire_drawdown' ? 'Wire Drawdown Request' : 'ACH Debit'}</Text>
+          </div>
           <div className="flex justify-between">
             <Text c="dimmed">Network:</Text>
             <Text>{NETWORK_LABELS[details.network]}</Text>

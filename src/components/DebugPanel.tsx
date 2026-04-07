@@ -4,15 +4,16 @@ import { getDashboardPath } from '../lib/increase';
 
 export function DebugPanel() {
   const { requests } = useApiLog();
+  const filteredRequests = requests.filter((req) => req.method !== 'GET');
 
   return (
     <div className="h-full overflow-auto bg-gray-50 p-4">
       <h2 className="text-lg font-semibold mb-4">API Requests</h2>
       <div className="flex flex-col gap-2">
-        {requests.length === 0 ? (
+        {filteredRequests.length === 0 ? (
           <Text c="dimmed" size="sm">No requests yet</Text>
         ) : (
-          requests.map((req) => {
+          filteredRequests.map((req) => {
             const dashboardUrl =
               req.resourceId && getDashboardPath(req.resourceType, req.resourceId);
             return (

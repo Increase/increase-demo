@@ -129,11 +129,8 @@ export async function setupDemoSession(
 
   // 5. Product-specific setup
   if (config.product === 'bill_pay') {
-    result.externalAccount = await loggedRequest(
-      logFn,
-      'POST',
-      'external_accounts',
-      () =>
+    const [externalAccount, accountNumber] = await Promise.all([
+      loggedRequest(logFn, 'POST', 'external_accounts', () =>
         client.externalAccounts.create({
           account_number: '987654321',
           routing_number: '101050001',
@@ -141,7 +138,16 @@ export async function setupDemoSession(
           account_holder: 'business',
           funding: 'checking',
         })
-    );
+      ),
+      loggedRequest(logFn, 'POST', 'account_numbers', () =>
+        client.accountNumbers.create({
+          account_id: account.id,
+          name: 'Bill Pay Account Number',
+        })
+      ),
+    ]);
+    result.externalAccount = externalAccount;
+    result.accountNumber = accountNumber;
   }
 
   if (config.product === 'banking') {
@@ -219,14 +225,7 @@ export async function setupDemoSession(
       );
     }
 
-    // Phase 3: ACH simulation (sequential) and card authorizations (parallel)
-    // Only submit if pending_approval or pending_submission
-    if (achTransfer.status === 'pending_approval' || achTransfer.status === 'pending_submission') {
-      await loggedRequest(logFn, 'POST', `simulations/ach_transfers/${achTransfer.id}/submit`, () =>
-        client.simulations.achTransfers.submit(achTransfer.id)
-      );
-    }
-    // Settle after submit
+    // Phase 3: Settle ACH (settle auto-submits if still pending_submission) and card authorizations
     await loggedRequest(logFn, 'POST', `simulations/ach_transfers/${achTransfer.id}/settle`, () =>
       client.simulations.achTransfers.settle(achTransfer.id, {})
     );
