@@ -464,13 +464,10 @@ export function BankingProvider({ children }: { children: ReactNode }) {
           creditor: { name: details.recipientName || 'Recipient' },
           remittance: {
             category: 'unstructured',
-            tax: null,
             unstructured: {
-              line1: details.statementDescriptor || 'Wire transfer',
-              line2: null,
-              line3: null,
+              message: details.statementDescriptor || 'Wire transfer',
             },
-          },
+          } as Parameters<typeof client.wireTransfers.create>[0]['remittance'],
         });
         logFn({
           id: crypto.randomUUID(),
