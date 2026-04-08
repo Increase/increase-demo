@@ -213,7 +213,7 @@ export function CreateBillPaymentModal({
   }));
 
   return (
-    <Modal opened={isOpen} onClose={handleClose} title="Create Bill Payment" size="lg">
+    <Modal opened={isOpen} onClose={handleClose} title="Create Payment" size="lg">
       <div className="flex flex-col gap-4">
         {/* External Account Selection */}
         <Select

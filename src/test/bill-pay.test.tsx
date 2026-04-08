@@ -49,9 +49,9 @@ describe('Bill Pay Flow', () => {
     const newPaymentButton = screen.getByRole('button', { name: /new payment/i });
     await user.click(newPaymentButton);
 
-    // Wait for modal to open - look for the modal title text
+    // Wait for modal to open - look for the funding source label inside the modal
     await waitFor(() => {
-      expect(screen.getByText('Create Bill Payment')).toBeInTheDocument();
+      expect(screen.getByText(/funding source/i)).toBeInTheDocument();
     }, { timeout: 5000 });
 
     // Step 3: Fill out the payment form
@@ -85,7 +85,7 @@ describe('Bill Pay Flow', () => {
 
     // Wait for modal to close and payment to appear in list
     await waitFor(() => {
-      expect(screen.queryByText('Create Bill Payment')).not.toBeInTheDocument();
+      expect(screen.queryByText('Create Payment')).not.toBeInTheDocument();
     }, { timeout: 10000 });
 
     // Step 4: Click on the payment to view details

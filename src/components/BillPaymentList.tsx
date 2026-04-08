@@ -56,7 +56,7 @@ export function BillPaymentList({ payments, onSelect, onCreateNew, onInvoiceDrop
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Bill Payments</h2>
+        <h2 className="text-lg font-semibold">Payments</h2>
         <Button size="sm" onClick={onCreateNew}>
           New Payment
         </Button>
@@ -95,7 +95,7 @@ export function BillPaymentList({ payments, onSelect, onCreateNew, onInvoiceDrop
       {payments.length === 0 ? (
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Text c="dimmed" ta="center" py="md">
-            No bill payments yet. Create one to get started.
+            No payments yet. Create one to get started.
           </Text>
         </Card>
       ) : (
