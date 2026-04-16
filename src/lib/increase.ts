@@ -129,25 +129,16 @@ export async function setupDemoSession(
 
   // 5. Product-specific setup
   if (config.product === 'bill_pay') {
-    const [externalAccount, accountNumber] = await Promise.all([
-      loggedRequest(logFn, 'POST', 'external_accounts', () =>
-        client.externalAccounts.create({
-          account_number: '987654321',
-          routing_number: '101050001',
-          description: 'Customer External Account (Chase Bank)',
-          account_holder: 'business',
-          funding: 'checking',
-        })
-      ),
-      loggedRequest(logFn, 'POST', 'account_numbers', () =>
-        client.accountNumbers.create({
-          account_id: account.id,
-          name: 'Bill Pay Account Number',
-        })
-      ),
-    ]);
+    const externalAccount = await loggedRequest(logFn, 'POST', 'external_accounts', () =>
+      client.externalAccounts.create({
+        account_number: '987654321',
+        routing_number: '101050001',
+        description: 'Customer External Account (Chase Bank)',
+        account_holder: 'business',
+        funding: 'checking',
+      })
+    );
     result.externalAccount = externalAccount;
-    result.accountNumber = accountNumber;
   }
 
   if (config.product === 'banking') {
