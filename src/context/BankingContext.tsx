@@ -36,7 +36,8 @@ interface BankingContextType {
     apiKey: string,
     accountId: string,
     description: string,
-    logFn: (req: ApiRequest) => void
+    logFn: (req: ApiRequest) => void,
+    authorizationControls?: Increase.CardCreateParams['authorization_controls']
   ) => Promise<Increase.Card>;
   simulateInbound: (
     apiKey: string,
@@ -267,13 +268,15 @@ export function BankingProvider({ children }: { children: ReactNode }) {
       apiKey: string,
       accountId: string,
       description: string,
-      logFn: (req: ApiRequest) => void
+      logFn: (req: ApiRequest) => void,
+      authorizationControls?: Increase.CardCreateParams['authorization_controls']
     ): Promise<Increase.Card> => {
       const client = createIncreaseClient(apiKey);
 
       const card = await client.cards.create({
         account_id: accountId,
         description,
+        ...(authorizationControls && { authorization_controls: authorizationControls }),
       });
 
       logFn({

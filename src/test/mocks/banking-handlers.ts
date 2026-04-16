@@ -62,6 +62,7 @@ interface Card {
   account_id: string;
   expiration_month: number;
   expiration_year: number;
+  authorization_controls: Record<string, unknown> | null;
 }
 
 interface AccountNumber {
@@ -353,7 +354,11 @@ export const bankingHandlers = [
 
   // Create Card
   http.post('*/cards', async ({ request }) => {
-    const body = (await request.json()) as { account_id?: string; description?: string };
+    const body = (await request.json()) as {
+      account_id?: string;
+      description?: string;
+      authorization_controls?: Record<string, unknown>;
+    };
     const card: Card = {
       id: nextId('card'),
       account_id: body.account_id || state.accountId || 'account_test_1',
@@ -363,6 +368,7 @@ export const bankingHandlers = [
       created_at: new Date().toISOString(),
       expiration_month: 1,
       expiration_year: 2030,
+      authorization_controls: body.authorization_controls || null,
     };
     state.cards.unshift(card);
     state.cardIds.push(card.id);
@@ -394,6 +400,7 @@ export const bankingHandlers = [
           state: 'CA',
           postal_code: '94102',
         },
+        authorization_controls: card.authorization_controls,
       })),
     });
   }),

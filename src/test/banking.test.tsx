@@ -165,4 +165,167 @@ describe('Banking Flow', () => {
       expect(screen.getByText('Test Virtual Card')).toBeInTheDocument();
     });
   });
+
+  it('can create a single-use card with a spend limit', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    // Complete setup form with Banking product
+    const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
+    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+
+    await user.clear(apiKeyInput);
+    await user.type(apiKeyInput, 'test_api_key_123');
+    await user.clear(companyNameInput);
+    await user.type(companyNameInput, 'Test Banking Company');
+
+    const productLabel = screen.getByText('Product');
+    const productWrapper = productLabel.closest('.mantine-Select-root') || productLabel.parentElement;
+    const productInput = productWrapper?.querySelector('input');
+    await user.click(productInput!);
+    await waitFor(() => {
+      expect(screen.getByText('Banking')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('Banking'));
+
+    const createSessionButton = screen.getByRole('button', { name: /create demo session/i });
+    await user.click(createSessionButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Operating Account')).toBeInTheDocument();
+    }, { timeout: 10000 });
+
+    // Navigate to cards list
+    const viewAllButton = screen.getByRole('button', { name: /view all/i });
+    await user.click(viewAllButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cards')).toBeInTheDocument();
+    });
+
+    // Open create card modal
+    const createCardButton = screen.getByRole('button', { name: /create card/i });
+    await user.click(createCardButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create Card')).toBeInTheDocument();
+    });
+
+    // Enter description
+    const descriptionInput = screen.getByPlaceholderText(/card description/i);
+    await user.type(descriptionInput, 'Single Use Gift Card');
+
+    // Switch to single-use
+    await user.click(screen.getByText('Single-use'));
+
+    // Enter amount limit
+    const amountInput = screen.getByPlaceholderText('0.00');
+    await user.type(amountInput, '250');
+
+    // Submit
+    const submitButtons = screen.getAllByRole('button', { name: /✨ create card/i });
+    const submitButton = submitButtons.find(btn => btn.getAttribute('type') === 'submit');
+    await user.click(submitButton!);
+
+    // Wait for modal to close
+    await waitFor(() => {
+      expect(screen.queryByText('Create Card')).not.toBeInTheDocument();
+    }, { timeout: 10000 });
+
+    // Verify card appears in the list
+    await waitFor(() => {
+      expect(screen.getByText('Single Use Gift Card')).toBeInTheDocument();
+    });
+
+    // Click the card to navigate to detail
+    await user.click(screen.getByText('Single Use Gift Card'));
+
+    // Verify card detail shows spend controls
+    await waitFor(() => {
+      expect(screen.getByText('Single-use')).toBeInTheDocument();
+      expect(screen.getByText('Amount Limit')).toBeInTheDocument();
+      expect(screen.getByText(/Up to/)).toBeInTheDocument();
+      expect(screen.getByText(/\$250\.00/)).toBeInTheDocument();
+    });
+  });
+
+  it('can create a multi-use card with a spending limit', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    // Complete setup form with Banking product
+    const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
+    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+
+    await user.clear(apiKeyInput);
+    await user.type(apiKeyInput, 'test_api_key_123');
+    await user.clear(companyNameInput);
+    await user.type(companyNameInput, 'Test Banking Company');
+
+    const productLabel = screen.getByText('Product');
+    const productWrapper = productLabel.closest('.mantine-Select-root') || productLabel.parentElement;
+    const productInput = productWrapper?.querySelector('input');
+    await user.click(productInput!);
+    await waitFor(() => {
+      expect(screen.getByText('Banking')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('Banking'));
+
+    const createSessionButton = screen.getByRole('button', { name: /create demo session/i });
+    await user.click(createSessionButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Operating Account')).toBeInTheDocument();
+    }, { timeout: 10000 });
+
+    // Navigate to cards list
+    const viewAllButton = screen.getByRole('button', { name: /view all/i });
+    await user.click(viewAllButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cards')).toBeInTheDocument();
+    });
+
+    // Open create card modal
+    const createCardButton = screen.getByRole('button', { name: /create card/i });
+    await user.click(createCardButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create Card')).toBeInTheDocument();
+    });
+
+    // Enter description
+    const descriptionInput = screen.getByPlaceholderText(/card description/i);
+    await user.type(descriptionInput, 'Marketing Budget Card');
+
+    // Multi-use is already selected by default - enter a spending limit
+    const limitInput = screen.getByPlaceholderText('No limit');
+    await user.type(limitInput, '5000');
+
+    // Submit
+    const submitButtons = screen.getAllByRole('button', { name: /✨ create card/i });
+    const submitButton = submitButtons.find(btn => btn.getAttribute('type') === 'submit');
+    await user.click(submitButton!);
+
+    // Wait for modal to close
+    await waitFor(() => {
+      expect(screen.queryByText('Create Card')).not.toBeInTheDocument();
+    }, { timeout: 10000 });
+
+    // Verify card appears in the list
+    await waitFor(() => {
+      expect(screen.getByText('Marketing Budget Card')).toBeInTheDocument();
+    });
+
+    // Click the card to navigate to detail
+    await user.click(screen.getByText('Marketing Budget Card'));
+
+    // Verify card detail shows spend controls
+    await waitFor(() => {
+      expect(screen.getByText('Multi-use')).toBeInTheDocument();
+      expect(screen.getByText('Spending Limit')).toBeInTheDocument();
+      expect(screen.getByText(/\$5,000\.00/)).toBeInTheDocument();
+      expect(screen.getByText(/per month/)).toBeInTheDocument();
+    });
+  });
 });

@@ -18,6 +18,17 @@ function formatDate(dateString: string): string {
   });
 }
 
+function formatInterval(interval: string): string {
+  switch (interval) {
+    case 'per_transaction': return 'per transaction';
+    case 'per_day': return 'per day';
+    case 'per_week': return 'per week';
+    case 'per_month': return 'per month';
+    case 'all_time': return 'all time';
+    default: return interval;
+  }
+}
+
 function getStatusColor(status: string): string {
   switch (status) {
     case 'active':
@@ -75,6 +86,34 @@ export function CardDetail({ cardId, onBack }: CardDetailProps) {
               <Text>{card.description}</Text>
             </div>
           )}
+
+          <div>
+            <Text size="sm" c="dimmed">Usage</Text>
+            <Text>{card.authorization_controls?.usage?.category === 'single_use' ? 'Single-use' : 'Multi-use'}</Text>
+          </div>
+
+          {card.authorization_controls?.usage?.category === 'single_use' &&
+            card.authorization_controls.usage.single_use && (
+              <div>
+                <Text size="sm" c="dimmed">Amount Limit</Text>
+                <Text>
+                  {card.authorization_controls.usage.single_use.settlement_amount.comparison === 'equals'
+                    ? 'Exactly '
+                    : 'Up to '}
+                  {formatCurrency(card.authorization_controls.usage.single_use.settlement_amount.value)}
+                </Text>
+              </div>
+            )}
+
+          {card.authorization_controls?.usage?.category === 'multi_use' &&
+            card.authorization_controls.usage.multi_use?.spending_limits?.map((limit, i) => (
+              <div key={i}>
+                <Text size="sm" c="dimmed">Spending Limit</Text>
+                <Text>
+                  {formatCurrency(limit.settlement_amount)} {formatInterval(limit.interval)}
+                </Text>
+              </div>
+            ))}
 
           <div>
             <Text size="sm" c="dimmed">Created</Text>
