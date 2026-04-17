@@ -346,7 +346,7 @@ export function BillPaymentProvider({ children }: { children: ReactNode }) {
             destination_routing_number: paymentDetails.routingNumber,
             amount: payment.amount,
             creditor_name: paymentDetails.statementDescriptor,
-            remittance_information: paymentDetails.statementDescriptor,
+            unstructured_remittance_information: paymentDetails.statementDescriptor,
           });
           creditTransferId = creditTransfer.id;
 

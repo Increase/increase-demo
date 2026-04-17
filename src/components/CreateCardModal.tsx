@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Modal, TextInput, Button, SegmentedControl, Select, NumberInput } from '@mantine/core';
 import { useBanking } from '../context/BankingContext';
 import { useApiLog } from '../context/ApiLogContext';
-import type { DemoSession, CardAuthorizationControls } from '../types';
+import type Increase from 'increase';
+import type { DemoSession } from '../types';
 
 interface CreateCardModalProps {
   opened: boolean;
@@ -39,7 +40,7 @@ export function CreateCardModal({ opened, onClose, session, onSuccess }: CreateC
     setError(null);
 
     try {
-      const authorizationControls: CardAuthorizationControls = {
+      const authorizationControls: Increase.CardCreateParams.AuthorizationControls = {
         usage: usageCategory === 'single_use'
           ? {
               category: 'single_use',

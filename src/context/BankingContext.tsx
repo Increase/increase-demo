@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type Increase from 'increase';
-import type { ApiRequest, CardAuthorizationControls, InboundTransferType, OutboundTransferNetwork, TransferDetailType } from '../types';
+import type { ApiRequest, InboundTransferType, OutboundTransferNetwork, TransferDetailType } from '../types';
 import { createIncreaseClient } from '../lib/increase';
 
 interface BankingContextType {
@@ -37,7 +37,7 @@ interface BankingContextType {
     accountId: string,
     description: string,
     logFn: (req: ApiRequest) => void,
-    authorizationControls?: CardAuthorizationControls
+    authorizationControls?: Increase.CardCreateParams['authorization_controls']
   ) => Promise<Increase.Card>;
   simulateInbound: (
     apiKey: string,
@@ -269,7 +269,7 @@ export function BankingProvider({ children }: { children: ReactNode }) {
       accountId: string,
       description: string,
       logFn: (req: ApiRequest) => void,
-      authorizationControls?: CardAuthorizationControls
+      authorizationControls?: Increase.CardCreateParams['authorization_controls']
     ): Promise<Increase.Card> => {
       const client = createIncreaseClient(apiKey);
 
@@ -488,7 +488,7 @@ export function BankingProvider({ children }: { children: ReactNode }) {
         const result = await client.realTimePaymentsTransfers.create({
           amount,
           creditor_name: details.recipientName || 'Recipient',
-          remittance_information: details.statementDescriptor || 'RTP transfer',
+          unstructured_remittance_information: details.statementDescriptor || 'RTP transfer',
           source_account_number_id: accountNumberId,
           destination_account_number: details.accountNumber!,
           destination_routing_number: details.routingNumber!,

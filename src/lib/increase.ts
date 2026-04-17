@@ -83,12 +83,13 @@ export async function setupDemoSession(
       structure: 'corporation',
       corporation: {
         name: config.companyName,
-        tax_identifier: '12-3456789',
+        legal_identifier: { value: '12-3456789' },
         address: {
           line1: '123 Main St',
           city: 'San Francisco',
           state: 'CA',
           zip: '94102',
+          country: 'US',
         },
         beneficial_owners: [
           {
@@ -212,7 +213,7 @@ export async function setupDemoSession(
     const checkDepositId = mailItem.checks?.[0]?.check_deposit_id;
     if (checkDepositId) {
       await loggedRequest(logFn, 'POST', `simulations/check_deposits/${checkDepositId}/submit`, () =>
-        client.simulations.checkDeposits.submit(checkDepositId)
+        client.simulations.checkDeposits.submit(checkDepositId, {})
       );
     }
 

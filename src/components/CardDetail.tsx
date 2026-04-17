@@ -1,6 +1,5 @@
 import { Card, Text, Button, Badge } from '@mantine/core';
 import { useBanking } from '../context/BankingContext';
-import type { CardAuthorizationControls } from '../types';
 
 interface CardDetailProps {
   cardId: string;
@@ -46,7 +45,7 @@ function getStatusColor(status: string): string {
 export function CardDetail({ cardId, onBack }: CardDetailProps) {
   const { cards, transactions } = useBanking();
   const card = cards.find((c) => c.id === cardId);
-  const authControls = card?.authorization_controls as CardAuthorizationControls | null | undefined;
+  const authControls = card?.authorization_controls;
   const cardTransactions = transactions.filter((t) => t.route_id === cardId);
 
   if (!card) {
