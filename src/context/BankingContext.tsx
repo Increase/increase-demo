@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type Increase from 'increase';
-import type { ApiRequest, InboundTransferType, OutboundTransferNetwork, TransferDetailType } from '../types';
+import type { ApiRequest, CardAuthorizationControls, InboundTransferType, OutboundTransferNetwork, TransferDetailType } from '../types';
 import { createIncreaseClient } from '../lib/increase';
 
 interface BankingContextType {
@@ -37,7 +37,7 @@ interface BankingContextType {
     accountId: string,
     description: string,
     logFn: (req: ApiRequest) => void,
-    authorizationControls?: Increase.CardCreateParams['authorization_controls']
+    authorizationControls?: CardAuthorizationControls
   ) => Promise<Increase.Card>;
   simulateInbound: (
     apiKey: string,
@@ -269,15 +269,18 @@ export function BankingProvider({ children }: { children: ReactNode }) {
       accountId: string,
       description: string,
       logFn: (req: ApiRequest) => void,
-      authorizationControls?: Increase.CardCreateParams['authorization_controls']
+      authorizationControls?: CardAuthorizationControls
     ): Promise<Increase.Card> => {
       const client = createIncreaseClient(apiKey);
 
-      const card = await client.cards.create({
+      const params: Increase.CardCreateParams = {
         account_id: accountId,
         description,
-        ...(authorizationControls && { authorization_controls: authorizationControls }),
-      });
+      };
+      if (authorizationControls) {
+        params.authorization_controls = authorizationControls;
+      }
+      const card = await client.cards.create(params);
 
       logFn({
         id: crypto.randomUUID(),

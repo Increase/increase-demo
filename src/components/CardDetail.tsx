@@ -1,5 +1,6 @@
 import { Card, Text, Button, Badge } from '@mantine/core';
 import { useBanking } from '../context/BankingContext';
+import type { CardAuthorizationControls } from '../types';
 
 interface CardDetailProps {
   cardId: string;
@@ -45,6 +46,7 @@ function getStatusColor(status: string): string {
 export function CardDetail({ cardId, onBack }: CardDetailProps) {
   const { cards, transactions } = useBanking();
   const card = cards.find((c) => c.id === cardId);
+  const authControls = card?.authorization_controls as CardAuthorizationControls | null | undefined;
   const cardTransactions = transactions.filter((t) => t.route_id === cardId);
 
   if (!card) {
@@ -89,24 +91,24 @@ export function CardDetail({ cardId, onBack }: CardDetailProps) {
 
           <div>
             <Text size="sm" c="dimmed">Usage</Text>
-            <Text>{card.authorization_controls?.usage?.category === 'single_use' ? 'Single-use' : 'Multi-use'}</Text>
+            <Text>{authControls?.usage?.category === 'single_use' ? 'Single-use' : 'Multi-use'}</Text>
           </div>
 
-          {card.authorization_controls?.usage?.category === 'single_use' &&
-            card.authorization_controls.usage.single_use && (
+          {authControls?.usage?.category === 'single_use' &&
+            authControls.usage.single_use && (
               <div>
                 <Text size="sm" c="dimmed">Amount Limit</Text>
                 <Text>
-                  {card.authorization_controls.usage.single_use.settlement_amount.comparison === 'equals'
+                  {authControls.usage.single_use.settlement_amount.comparison === 'equals'
                     ? 'Exactly '
                     : 'Up to '}
-                  {formatCurrency(card.authorization_controls.usage.single_use.settlement_amount.value)}
+                  {formatCurrency(authControls.usage.single_use.settlement_amount.value)}
                 </Text>
               </div>
             )}
 
-          {card.authorization_controls?.usage?.category === 'multi_use' &&
-            card.authorization_controls.usage.multi_use?.spending_limits?.map((limit, i) => (
+          {authControls?.usage?.category === 'multi_use' &&
+            authControls.usage.multi_use?.spending_limits?.map((limit, i) => (
               <div key={i}>
                 <Text size="sm" c="dimmed">Spending Limit</Text>
                 <Text>

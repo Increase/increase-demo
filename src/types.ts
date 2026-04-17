@@ -106,6 +106,25 @@ export interface BillPayment {
   error?: string;
 }
 
+// Card Authorization Controls (not yet typed in the SDK)
+export interface CardAuthorizationControls {
+  usage?: {
+    category: 'single_use' | 'multi_use';
+    single_use?: {
+      settlement_amount: {
+        comparison: 'equals' | 'less_than_or_equals';
+        value: number;
+      };
+    };
+    multi_use?: {
+      spending_limits?: Array<{
+        interval: 'all_time' | 'per_transaction' | 'per_day' | 'per_week' | 'per_month';
+        settlement_amount: number;
+      }>;
+    };
+  };
+}
+
 // Banking Types
 export type TransferDetailType =
   | 'ach_transfer'
