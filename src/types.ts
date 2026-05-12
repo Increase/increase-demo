@@ -9,6 +9,7 @@ export interface ApiRequest {
   status: number;
   resourceType: string;
   resourceId?: string;
+  errorDetail?: string;
   timestamp: Date;
 }
 

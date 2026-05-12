@@ -12,6 +12,18 @@ app.use('/api', createProxyMiddleware({
   target: 'https://sandbox.increase.com',
   changeOrigin: true,
   pathRewrite: { '^/api': '' },
+  on: {
+    proxyReq: (proxyReq) => {
+      proxyReq.removeHeader('referer');
+      proxyReq.removeHeader('origin');
+      proxyReq.removeHeader('sec-fetch-site');
+      proxyReq.removeHeader('sec-fetch-mode');
+      proxyReq.removeHeader('sec-fetch-dest');
+      proxyReq.removeHeader('sec-ch-ua');
+      proxyReq.removeHeader('sec-ch-ua-mobile');
+      proxyReq.removeHeader('sec-ch-ua-platform');
+    },
+  },
 }));
 
 // Serve static files from the dist directory

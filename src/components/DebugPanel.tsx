@@ -4,7 +4,10 @@ import { getDashboardPath } from '../lib/increase';
 
 export function DebugPanel() {
   const { requests } = useApiLog();
-  const filteredRequests = requests.filter((req) => req.method !== 'GET');
+  // Show all non-GET requests, plus any failed GET requests so 4xx/5xx errors are visible.
+  const filteredRequests = requests.filter(
+    (req) => req.method !== 'GET' || req.status < 200 || req.status >= 300
+  );
 
   return (
     <div className="h-full overflow-auto bg-gray-50 p-4">
@@ -31,6 +34,11 @@ export function DebugPanel() {
                   </Text>
                   <Text size="xs" ff="monospace">/{req.path}</Text>
                 </div>
+                {req.errorDetail && (
+                  <Text size="xs" c="red" mb="xs">
+                    {req.errorDetail}
+                  </Text>
+                )}
                 {req.resourceId && (
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
