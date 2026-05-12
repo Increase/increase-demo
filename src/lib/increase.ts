@@ -15,7 +15,7 @@ function getResourceType(path: string): string {
 
 function getDashboardPath(resourceType: string, id: string): string | null {
   const typeMap: Record<string, string | null> = {
-    entities: 'entities',
+    entities: 'compliance/entities',
     accounts: 'accounts',
     account_numbers: 'account_numbers',
     external_accounts: 'external_accounts',
