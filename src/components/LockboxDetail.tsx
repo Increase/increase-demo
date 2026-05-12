@@ -3,15 +3,12 @@ import { Card, Text, Button } from '@mantine/core';
 import { useBanking } from '../context/BankingContext';
 import { useApiLog } from '../context/ApiLogContext';
 import type { DemoSession } from '../types';
+import { formatCurrency } from '../lib/formatting';
 
 interface LockboxDetailProps {
   session: DemoSession;
   onBack: () => void;
   onRefresh: () => void;
-}
-
-function formatCurrency(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 }
 
 function formatDate(dateString: string): string {

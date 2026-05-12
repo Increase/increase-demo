@@ -1,13 +1,10 @@
 import { Card, Text, Button, Badge } from '@mantine/core';
 import { useBanking } from '../context/BankingContext';
+import { formatCurrency } from '../lib/formatting';
 
 interface CardDetailProps {
   cardId: string;
   onBack: () => void;
-}
-
-function formatCurrency(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 }
 
 function formatDate(dateString: string): string {
