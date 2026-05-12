@@ -23,14 +23,18 @@ function formatDate(dateString: string): string {
 }
 
 export function LockboxDetail({ session, onBack }: LockboxDetailProps) {
-  const { lockboxes, transactions, rollLockbox } = useBanking();
+  const { lockboxAddresses, lockboxRecipients, transactions, rollLockbox } = useBanking();
   const { addRequest } = useApiLog();
   const [isRolling, setIsRolling] = useState(false);
 
   // Use context data if available, otherwise fall back to session data
-  const primaryLockbox = lockboxes[0] || session.lockbox;
+  const primaryRecipient = lockboxRecipients[0] || session.lockboxRecipient;
+  const primaryAddress =
+    lockboxAddresses.find((a) => a.id === primaryRecipient?.lockbox_address_id) ||
+    lockboxAddresses[0] ||
+    session.lockboxAddress;
   const lockboxTransactions = transactions.filter(
-    (t) => t.route_id === primaryLockbox?.id
+    (t) => t.route_id === primaryRecipient?.id || t.route_id === primaryAddress?.id
   );
 
   const handleRoll = async () => {
@@ -42,7 +46,7 @@ export function LockboxDetail({ session, onBack }: LockboxDetailProps) {
     }
   };
 
-  if (!primaryLockbox) {
+  if (!primaryRecipient && !primaryAddress) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <Button variant="subtle" onClick={onBack}>
@@ -55,6 +59,12 @@ export function LockboxDetail({ session, onBack }: LockboxDetailProps) {
     );
   }
 
+  const title =
+    primaryRecipient?.recipient_name ||
+    primaryRecipient?.description ||
+    primaryAddress?.description ||
+    'Primary Lockbox';
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <Button variant="subtle" onClick={onBack} className="self-start">
@@ -65,9 +75,7 @@ export function LockboxDetail({ session, onBack }: LockboxDetailProps) {
         <div className="flex justify-between items-start mb-4">
           <div>
             <Text size="sm" c="dimmed">Lockbox</Text>
-            <Text size="xl" fw={700}>
-              {primaryLockbox.description || 'Primary Lockbox'}
-            </Text>
+            <Text size="xl" fw={700}>{title}</Text>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -84,26 +92,38 @@ export function LockboxDetail({ session, onBack }: LockboxDetailProps) {
         <div className="flex flex-col gap-3">
           <div>
             <Text size="sm" c="dimmed">Mailing Address</Text>
-            <Text>{primaryLockbox.description || 'Primary Lockbox'}</Text>
-            <Text>{primaryLockbox.address?.line1}</Text>
-            {primaryLockbox.address?.line2 && (
-              <Text>{primaryLockbox.address.line2}</Text>
+            <Text>{title}</Text>
+            {primaryRecipient?.mail_stop_code && (
+              <Text>Mail Stop {primaryRecipient.mail_stop_code}</Text>
+            )}
+            <Text>{primaryAddress?.address?.line1}</Text>
+            {primaryAddress?.address?.line2 && (
+              <Text>{primaryAddress.address.line2}</Text>
             )}
             <Text>
-              {primaryLockbox.address?.city}, {primaryLockbox.address?.state}{' '}
-              {primaryLockbox.address?.postal_code}
+              {primaryAddress?.address?.city}, {primaryAddress?.address?.state}{' '}
+              {primaryAddress?.address?.postal_code}
             </Text>
           </div>
 
           <div>
             <Text size="sm" c="dimmed">Created</Text>
-            <Text>{formatDate(primaryLockbox.created_at)}</Text>
+            <Text>{formatDate(primaryRecipient?.created_at || primaryAddress!.created_at)}</Text>
           </div>
 
-          <div>
-            <Text size="sm" c="dimmed">Lockbox ID</Text>
-            <Text ff="monospace" size="sm">{primaryLockbox.id}</Text>
-          </div>
+          {primaryAddress && (
+            <div>
+              <Text size="sm" c="dimmed">Lockbox Address ID</Text>
+              <Text ff="monospace" size="sm">{primaryAddress.id}</Text>
+            </div>
+          )}
+
+          {primaryRecipient && (
+            <div>
+              <Text size="sm" c="dimmed">Lockbox Recipient ID</Text>
+              <Text ff="monospace" size="sm">{primaryRecipient.id}</Text>
+            </div>
+          )}
         </div>
       </Card>
 
