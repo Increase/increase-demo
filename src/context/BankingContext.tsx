@@ -109,81 +109,98 @@ export function BankingProvider({ children }: { children: ReactNode }) {
     ): Promise<void> => {
       const client = createIncreaseClient(apiKey);
 
-      const reads: { path: string; resourceType: string; call: () => Promise<unknown>; apply: (value: unknown) => void }[] = [
-        {
+      // Fetch all data in parallel, using allSettled so individual failures don't prevent other data from loading
+      const results = await Promise.allSettled([
+        client.accounts.retrieve(accountId),
+        client.accounts.balance(accountId),
+        client.accountNumbers.list({ account_id: accountId }),
+        client.lockboxes.list({ account_id: accountId }),
+        client.pendingTransactions.list({ account_id: accountId, status: { in: ['pending'] } }),
+        client.transactions.list({ account_id: accountId }),
+        client.cards.list({ account_id: accountId }),
+      ]);
+
+      const [accountResult, balanceResult, accountNumbersResult, lockboxesResult, pendingTransactionsResult, transactionsResult, cardsResult] = results;
+
+      // Log and update each successful result
+      if (accountResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `accounts/${accountId}`,
+          status: 200,
           resourceType: 'accounts',
-          call: () => client.accounts.retrieve(accountId),
-          apply: (v) => setAccount(v as Increase.Account),
-        },
-        {
+          resourceId: accountResult.value.id,
+          timestamp: new Date(),
+        });
+        setAccount(accountResult.value);
+      }
+      if (balanceResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `accounts/${accountId}/balance`,
+          status: 200,
           resourceType: 'accounts',
-          call: () => client.accounts.balance(accountId),
-          apply: (v) => setBalance(v as Increase.BalanceLookup),
-        },
-        {
+          timestamp: new Date(),
+        });
+        setBalance(balanceResult.value);
+      }
+      if (accountNumbersResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `account_numbers?account_id=${accountId}`,
+          status: 200,
           resourceType: 'account_numbers',
-          call: () => client.accountNumbers.list({ account_id: accountId }),
-          apply: (v) => setAccountNumbers((v as { data: Increase.AccountNumber[] }).data),
-        },
-        {
+          timestamp: new Date(),
+        });
+        setAccountNumbers(accountNumbersResult.value.data);
+      }
+      if (lockboxesResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `lockboxes?account_id=${accountId}`,
+          status: 200,
           resourceType: 'lockboxes',
-          call: () => client.lockboxes.list({ account_id: accountId }),
-          apply: (v) => setLockboxes((v as { data: Increase.Lockbox[] }).data),
-        },
-        {
+          timestamp: new Date(),
+        });
+        setLockboxes(lockboxesResult.value.data);
+      }
+      if (pendingTransactionsResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `pending_transactions?account_id=${accountId}`,
+          status: 200,
           resourceType: 'pending_transactions',
-          call: () => client.pendingTransactions.list({ account_id: accountId, status: { in: ['pending'] } }),
-          apply: (v) => setPendingTransactions((v as { data: Increase.PendingTransaction[] }).data),
-        },
-        {
+          timestamp: new Date(),
+        });
+        setPendingTransactions(pendingTransactionsResult.value.data);
+      }
+      if (transactionsResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `transactions?account_id=${accountId}`,
+          status: 200,
           resourceType: 'transactions',
-          call: () => client.transactions.list({ account_id: accountId }),
-          apply: (v) => setTransactions((v as { data: Increase.Transaction[] }).data),
-        },
-        {
+          timestamp: new Date(),
+        });
+        setTransactions(transactionsResult.value.data);
+      }
+      if (cardsResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
           path: `cards?account_id=${accountId}`,
+          status: 200,
           resourceType: 'cards',
-          call: () => client.cards.list({ account_id: accountId }),
-          apply: (v) => setCards((v as { data: Increase.Card[] }).data),
-        },
-      ];
-
-      const results = await Promise.allSettled(reads.map((r) => r.call()));
-
-      results.forEach((result, i) => {
-        const read = reads[i];
-        if (result.status === 'fulfilled') {
-          read.apply(result.value);
-          logFn({
-            id: crypto.randomUUID(),
-            method: 'GET',
-            path: read.path,
-            status: 200,
-            resourceType: read.resourceType,
-            timestamp: new Date(),
-          });
-        } else {
-          const err = result.reason as { status?: number; error?: { detail?: string; title?: string; type?: string }; message?: string };
-          const status = err?.status ?? 0;
-          const detail = err?.error?.detail ?? err?.error?.title ?? err?.message ?? 'Unknown error';
-          console.error(`GET ${read.path} failed:`, err);
-          logFn({
-            id: crypto.randomUUID(),
-            method: 'GET',
-            path: read.path,
-            status,
-            resourceType: read.resourceType,
-            errorDetail: `${err?.error?.type ?? 'error'}: ${detail}`,
-            timestamp: new Date(),
-          });
-        }
-      });
+          timestamp: new Date(),
+        });
+        setCards(cardsResult.value.data);
+      }
     },
     []
   );
