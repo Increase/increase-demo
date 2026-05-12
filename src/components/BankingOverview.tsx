@@ -26,7 +26,7 @@ function formatDate(dateString: string): string {
 }
 
 export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverviewProps) {
-  const { account, balance, accountNumbers, lockboxes, pendingTransactions, transactions, cards, rollAccountNumber, rollLockbox } = useBanking();
+  const { account, balance, accountNumbers, lockboxAddresses, lockboxRecipients, pendingTransactions, transactions, cards, rollAccountNumber, rollLockbox } = useBanking();
   const { addRequest } = useApiLog();
   const [simulateModalOpen, setSimulateModalOpen] = useState(false);
   const [simulateType, setSimulateType] = useState<InboundTransferType>('wire');
@@ -36,7 +36,11 @@ export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverv
 
   // Use context data if available, otherwise fall back to session data from setup
   const primaryAccountNumber = accountNumbers[0] || session.accountNumber;
-  const primaryLockbox = lockboxes[0] || session.lockbox;
+  const primaryLockboxRecipient = lockboxRecipients[0] || session.lockboxRecipient;
+  const primaryLockboxAddress =
+    lockboxAddresses.find((a) => a.id === primaryLockboxRecipient?.lockbox_address_id) ||
+    lockboxAddresses[0] ||
+    session.lockboxAddress;
   const displayCards = cards.length > 0 ? cards.slice(0, 3) : (session.cards || []).slice(0, 3);
   const recentTransactions = transactions.slice(0, 10);
 
@@ -150,15 +154,23 @@ export function BankingOverview({ session, onNavigate, onRefresh }: BankingOverv
                 ↻ Roll
               </Button>
             </div>
-            {primaryLockbox ? (
+            {primaryLockboxRecipient || primaryLockboxAddress ? (
               <div className="flex flex-col">
-                <Text size="sm">{primaryLockbox.description || 'Primary Lockbox'}</Text>
-                <Text size="sm" c="dimmed">{primaryLockbox.address?.line1}</Text>
-                {primaryLockbox.address?.line2 && (
-                  <Text size="sm" c="dimmed">{primaryLockbox.address.line2}</Text>
+                <Text size="sm">
+                  {primaryLockboxRecipient?.recipient_name ||
+                    primaryLockboxRecipient?.description ||
+                    primaryLockboxAddress?.description ||
+                    'Primary Lockbox'}
+                </Text>
+                {primaryLockboxRecipient?.mail_stop_code && (
+                  <Text size="sm" c="dimmed">Mail Stop {primaryLockboxRecipient.mail_stop_code}</Text>
+                )}
+                <Text size="sm" c="dimmed">{primaryLockboxAddress?.address?.line1}</Text>
+                {primaryLockboxAddress?.address?.line2 && (
+                  <Text size="sm" c="dimmed">{primaryLockboxAddress.address.line2}</Text>
                 )}
                 <Text size="sm" c="dimmed">
-                  {primaryLockbox.address?.city}, {primaryLockbox.address?.state} {primaryLockbox.address?.postal_code}
+                  {primaryLockboxAddress?.address?.city}, {primaryLockboxAddress?.address?.state} {primaryLockboxAddress?.address?.postal_code}
                 </Text>
               </div>
             ) : (

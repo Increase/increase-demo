@@ -7,14 +7,16 @@ interface BankingContextType {
   account: Increase.Account | null;
   balance: Increase.BalanceLookup | null;
   accountNumbers: Increase.AccountNumber[];
-  lockboxes: Increase.Lockbox[];
+  lockboxAddresses: Increase.LockboxAddress[];
+  lockboxRecipients: Increase.LockboxRecipient[];
   pendingTransactions: Increase.PendingTransaction[];
   transactions: Increase.Transaction[];
   cards: Increase.Card[];
   initializeFromSession: (session: {
     account: Increase.Account;
     accountNumber?: Increase.AccountNumber;
-    lockbox?: Increase.Lockbox;
+    lockboxAddress?: Increase.LockboxAddress;
+    lockboxRecipient?: Increase.LockboxRecipient;
     cards?: Increase.Card[];
   }) => void;
   refreshData: (
@@ -31,7 +33,7 @@ interface BankingContextType {
     apiKey: string,
     accountId: string,
     logFn: (req: ApiRequest) => void
-  ) => Promise<Increase.Lockbox>;
+  ) => Promise<{ address: Increase.LockboxAddress; recipient: Increase.LockboxRecipient }>;
   createCard: (
     apiKey: string,
     accountId: string,
@@ -81,7 +83,8 @@ export function BankingProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<Increase.Account | null>(null);
   const [balance, setBalance] = useState<Increase.BalanceLookup | null>(null);
   const [accountNumbers, setAccountNumbers] = useState<Increase.AccountNumber[]>([]);
-  const [lockboxes, setLockboxes] = useState<Increase.Lockbox[]>([]);
+  const [lockboxAddresses, setLockboxAddresses] = useState<Increase.LockboxAddress[]>([]);
+  const [lockboxRecipients, setLockboxRecipients] = useState<Increase.LockboxRecipient[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Increase.PendingTransaction[]>([]);
   const [transactions, setTransactions] = useState<Increase.Transaction[]>([]);
   const [cards, setCards] = useState<Increase.Card[]>([]);
@@ -90,12 +93,14 @@ export function BankingProvider({ children }: { children: ReactNode }) {
     (session: {
       account: Increase.Account;
       accountNumber?: Increase.AccountNumber;
-      lockbox?: Increase.Lockbox;
+      lockboxAddress?: Increase.LockboxAddress;
+      lockboxRecipient?: Increase.LockboxRecipient;
       cards?: Increase.Card[];
     }) => {
       setAccount(session.account);
       if (session.accountNumber) setAccountNumbers((prev) => prev.length === 0 ? [session.accountNumber!] : prev);
-      if (session.lockbox) setLockboxes((prev) => prev.length === 0 ? [session.lockbox!] : prev);
+      if (session.lockboxAddress) setLockboxAddresses((prev) => prev.length === 0 ? [session.lockboxAddress!] : prev);
+      if (session.lockboxRecipient) setLockboxRecipients((prev) => prev.length === 0 ? [session.lockboxRecipient!] : prev);
       if (session.cards?.length) setCards((prev) => prev.length === 0 ? session.cards! : prev);
     },
     []
@@ -114,13 +119,14 @@ export function BankingProvider({ children }: { children: ReactNode }) {
         client.accounts.retrieve(accountId),
         client.accounts.balance(accountId),
         client.accountNumbers.list({ account_id: accountId }),
-        client.lockboxes.list({ account_id: accountId }),
+        client.lockboxRecipients.list({ account_id: accountId }),
+        client.lockboxAddresses.list(),
         client.pendingTransactions.list({ account_id: accountId, status: { in: ['pending'] } }),
         client.transactions.list({ account_id: accountId }),
         client.cards.list({ account_id: accountId }),
       ]);
 
-      const [accountResult, balanceResult, accountNumbersResult, lockboxesResult, pendingTransactionsResult, transactionsResult, cardsResult] = results;
+      const [accountResult, balanceResult, accountNumbersResult, lockboxRecipientsResult, lockboxAddressesResult, pendingTransactionsResult, transactionsResult, cardsResult] = results;
 
       // Log and update each successful result
       if (accountResult.status === 'fulfilled') {
@@ -157,16 +163,27 @@ export function BankingProvider({ children }: { children: ReactNode }) {
         });
         setAccountNumbers(accountNumbersResult.value.data);
       }
-      if (lockboxesResult.status === 'fulfilled') {
+      if (lockboxRecipientsResult.status === 'fulfilled') {
         logFn({
           id: crypto.randomUUID(),
           method: 'GET',
-          path: `lockboxes?account_id=${accountId}`,
+          path: `lockbox_recipients?account_id=${accountId}`,
           status: 200,
-          resourceType: 'lockboxes',
+          resourceType: 'lockbox_recipients',
           timestamp: new Date(),
         });
-        setLockboxes(lockboxesResult.value.data);
+        setLockboxRecipients(lockboxRecipientsResult.value.data);
+      }
+      if (lockboxAddressesResult.status === 'fulfilled') {
+        logFn({
+          id: crypto.randomUUID(),
+          method: 'GET',
+          path: `lockbox_addresses`,
+          status: 200,
+          resourceType: 'lockbox_addresses',
+          timestamp: new Date(),
+        });
+        setLockboxAddresses(lockboxAddressesResult.value.data);
       }
       if (pendingTransactionsResult.status === 'fulfilled') {
         logFn({
@@ -239,28 +256,45 @@ export function BankingProvider({ children }: { children: ReactNode }) {
       apiKey: string,
       accountId: string,
       logFn: (req: ApiRequest) => void
-    ): Promise<Increase.Lockbox> => {
+    ): Promise<{ address: Increase.LockboxAddress; recipient: Increase.LockboxRecipient }> => {
       const client = createIncreaseClient(apiKey);
+      const index = lockboxRecipients.length + 1;
 
-      const lockbox = await client.lockboxes.create({
-        account_id: accountId,
-        description: `Lockbox ${lockboxes.length + 1}`,
+      const address = await client.lockboxAddresses.create({
+        description: `Lockbox ${index}`,
       });
 
       logFn({
         id: crypto.randomUUID(),
         method: 'POST',
-        path: 'lockboxes',
+        path: 'lockbox_addresses',
         status: 200,
-        resourceType: 'lockboxes',
-        resourceId: lockbox.id,
+        resourceType: 'lockbox_addresses',
+        resourceId: address.id,
         timestamp: new Date(),
       });
 
-      setLockboxes((prev) => [lockbox, ...prev]);
-      return lockbox;
+      const recipient = await client.lockboxRecipients.create({
+        account_id: accountId,
+        lockbox_address_id: address.id,
+        description: `Lockbox ${index}`,
+      });
+
+      logFn({
+        id: crypto.randomUUID(),
+        method: 'POST',
+        path: 'lockbox_recipients',
+        status: 200,
+        resourceType: 'lockbox_recipients',
+        resourceId: recipient.id,
+        timestamp: new Date(),
+      });
+
+      setLockboxAddresses((prev) => [address, ...prev]);
+      setLockboxRecipients((prev) => [recipient, ...prev]);
+      return { address, recipient };
     },
-    [lockboxes.length]
+    [lockboxRecipients.length]
   );
 
   const createCard = useCallback(
@@ -540,7 +574,8 @@ export function BankingProvider({ children }: { children: ReactNode }) {
         account,
         balance,
         accountNumbers,
-        lockboxes,
+        lockboxAddresses,
+        lockboxRecipients,
         pendingTransactions,
         transactions,
         cards,

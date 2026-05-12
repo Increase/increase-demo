@@ -26,7 +26,8 @@ export interface DemoSession {
   externalAccount?: Increase.ExternalAccount;
   // Banking product
   accountNumber?: Increase.AccountNumber;
-  lockbox?: Increase.Lockbox;
+  lockboxAddress?: Increase.LockboxAddress;
+  lockboxRecipient?: Increase.LockboxRecipient;
   cards?: Increase.Card[];
 }
 

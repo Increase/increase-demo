@@ -29,7 +29,8 @@ interface BankingState {
   entityId: string | null;
   accountId: string | null;
   accountNumberId: string | null;
-  lockboxId: string | null;
+  lockboxAddressId: string | null;
+  lockboxRecipientId: string | null;
   cardIds: string[];
   achTransferId: string | null;
   pendingTransactionIds: string[];
@@ -37,7 +38,8 @@ interface BankingState {
   transactions: Transaction[];
   cards: Card[];
   accountNumbers: AccountNumber[];
-  lockboxes: Lockbox[];
+  lockboxAddresses: LockboxAddress[];
+  lockboxRecipients: LockboxRecipient[];
 }
 
 interface Transaction {
@@ -75,14 +77,12 @@ interface AccountNumber {
   created_at: string;
 }
 
-interface Lockbox {
+interface LockboxAddress {
   id: string;
-  account_id: string;
   description: string;
   status: string;
   created_at: string;
   address: {
-    recipient: string | null;
     line1: string;
     line2: string;
     city: string;
@@ -91,11 +91,23 @@ interface Lockbox {
   };
 }
 
+interface LockboxRecipient {
+  id: string;
+  account_id: string;
+  lockbox_address_id: string;
+  description: string | null;
+  recipient_name: string | null;
+  mail_stop_code: string;
+  status: string;
+  created_at: string;
+}
+
 const state: BankingState = {
   entityId: null,
   accountId: null,
   accountNumberId: null,
-  lockboxId: null,
+  lockboxAddressId: null,
+  lockboxRecipientId: null,
   cardIds: [],
   achTransferId: null,
   pendingTransactionIds: [],
@@ -103,11 +115,12 @@ const state: BankingState = {
   transactions: [],
   cards: [],
   accountNumbers: [],
-  lockboxes: [],
+  lockboxAddresses: [],
+  lockboxRecipients: [],
 };
 
 // Track pending check deposits from mail items
-const pendingCheckDeposits = new Map<string, { amount: number; lockbox_id: string }>();
+const pendingCheckDeposits = new Map<string, { amount: number; lockbox_recipient_id: string | null }>();
 
 // Generic transfer store for retrieve endpoints
 const transfers = new Map<string, Record<string, unknown>>();
@@ -116,7 +129,8 @@ export function resetBankingState() {
   state.entityId = null;
   state.accountId = null;
   state.accountNumberId = null;
-  state.lockboxId = null;
+  state.lockboxAddressId = null;
+  state.lockboxRecipientId = null;
   state.cardIds = [];
   state.achTransferId = null;
   state.pendingTransactionIds = [];
@@ -124,7 +138,8 @@ export function resetBankingState() {
   state.transactions = [];
   state.cards = [];
   state.accountNumbers = [];
-  state.lockboxes = [];
+  state.lockboxAddresses = [];
+  state.lockboxRecipients = [];
   pendingCheckDeposits.clear();
   transfers.clear();
   idCounter = 0;
@@ -289,66 +304,98 @@ export const bankingHandlers = [
     return HttpResponse.json({ data });
   }),
 
-  // Create Lockbox
-  http.post('*/lockboxes', async ({ request }) => {
-    const body = (await request.json()) as { account_id?: string; description?: string };
-    const lockbox: Lockbox = {
-      id: nextId('lockbox'),
-      account_id: body.account_id || state.accountId || 'account_test_1',
+  // Create Lockbox Address
+  http.post('*/lockbox_addresses', async ({ request }) => {
+    const body = (await request.json()) as { description?: string };
+    const lockboxAddress: LockboxAddress = {
+      id: nextId('lockbox_address'),
       description: body.description || 'Lockbox',
       status: 'active',
       created_at: new Date().toISOString(),
       address: {
-        recipient: null,
         line1: '2261 Market St',
-        line2: `Ste ${Math.floor(Math.random() * 9999)}-YMBPNY`,
+        line2: `Ste ${Math.floor(Math.random() * 9999)}`,
         city: 'San Francisco',
         state: 'CA',
         postal_code: '94114',
       },
     };
-    state.lockboxes.unshift(lockbox);
-    if (!state.lockboxId) {
-      state.lockboxId = lockbox.id;
+    state.lockboxAddresses.unshift(lockboxAddress);
+    if (!state.lockboxAddressId) {
+      state.lockboxAddressId = lockboxAddress.id;
     }
     return HttpResponse.json({
-      type: 'lockbox',
-      ...lockbox,
-      recipient_name: null,
-      check_deposit_behavior: 'enabled',
+      type: 'lockbox_address',
+      ...lockboxAddress,
+      idempotency_key: null,
     });
   }),
 
-  // List Lockboxes
-  http.get('*/lockboxes', async () => {
+  // List Lockbox Addresses
+  http.get('*/lockbox_addresses', async () => {
     const data =
-      state.lockboxes.length > 0
-        ? state.lockboxes.map((lb) => ({
-            type: 'lockbox',
+      state.lockboxAddresses.length > 0
+        ? state.lockboxAddresses.map((lb) => ({
+            type: 'lockbox_address',
             ...lb,
-            recipient_name: null,
-            check_deposit_behavior: 'enabled',
+            idempotency_key: null,
           }))
         : [
             {
-              type: 'lockbox',
-              id: 'lockbox_test_1',
-              account_id: state.accountId || 'account_test_1',
+              type: 'lockbox_address',
+              id: 'lockbox_address_test_1',
               description: 'Primary Lockbox',
               status: 'active',
               created_at: new Date().toISOString(),
-              recipient_name: null,
-              check_deposit_behavior: 'enabled',
+              idempotency_key: null,
               address: {
-                recipient: null,
                 line1: '2261 Market St',
-                line2: 'Ste 5792-YMBPNY',
+                line2: 'Ste 5792',
                 city: 'San Francisco',
                 state: 'CA',
                 postal_code: '94114',
               },
             },
           ];
+    return HttpResponse.json({ data });
+  }),
+
+  // Create Lockbox Recipient
+  http.post('*/lockbox_recipients', async ({ request }) => {
+    const body = (await request.json()) as {
+      account_id?: string;
+      lockbox_address_id?: string;
+      description?: string;
+      recipient_name?: string;
+    };
+    const recipient: LockboxRecipient = {
+      id: nextId('lockbox_recipient'),
+      account_id: body.account_id || state.accountId || 'account_test_1',
+      lockbox_address_id: body.lockbox_address_id || state.lockboxAddressId || 'lockbox_address_test_1',
+      description: body.description || null,
+      recipient_name: body.recipient_name || null,
+      mail_stop_code: `MS${Math.floor(Math.random() * 9000) + 1000}`,
+      status: 'active',
+      created_at: new Date().toISOString(),
+    };
+    state.lockboxRecipients.unshift(recipient);
+    if (!state.lockboxRecipientId) {
+      state.lockboxRecipientId = recipient.id;
+    }
+    return HttpResponse.json({
+      type: 'lockbox_recipient',
+      ...recipient,
+      idempotency_key: null,
+    });
+  }),
+
+  // List Lockbox Recipients
+  http.get('*/lockbox_recipients', async () => {
+    const data = state.lockboxRecipients.map((r) => ({
+      type: 'lockbox_recipient',
+      ...r,
+      idempotency_key: null,
+    }));
     return HttpResponse.json({ data });
   }),
 
@@ -539,16 +586,26 @@ export const bankingHandlers = [
 
   // Simulate Inbound Mail Items (lockbox check)
   http.post('*/simulations/inbound_mail_items', async ({ request }) => {
-    const body = (await request.json()) as { lockbox_id?: string; amount?: number };
+    const body = (await request.json()) as {
+      lockbox_address_id?: string;
+      lockbox_recipient_id?: string;
+      amount?: number;
+    };
     const mailItemId = nextId('inbound_mail_item');
     const checkDepositId = nextId('inbound_check_deposit');
     const fileId = nextId('file');
     const amount = body.amount || 250000;
+    const recipientId = body.lockbox_recipient_id || state.lockboxRecipientId || null;
+    const addressId =
+      body.lockbox_address_id ||
+      state.lockboxRecipients.find((r) => r.id === recipientId)?.lockbox_address_id ||
+      state.lockboxAddressId ||
+      'lockbox_address_test_1';
 
     // Store the check deposit info for later submission
     pendingCheckDeposits.set(checkDepositId, {
       amount,
-      lockbox_id: body.lockbox_id || state.lockboxId || 'lockbox_test_1',
+      lockbox_recipient_id: recipientId,
     });
 
     return HttpResponse.json({
@@ -556,11 +613,11 @@ export const bankingHandlers = [
       id: mailItemId,
       created_at: new Date().toISOString(),
       recipient_name: null,
-      return_address: null,
       status: 'processed',
       rejection_reason: null,
       file_id: fileId,
-      lockbox_id: body.lockbox_id || state.lockboxId,
+      lockbox_address_id: addressId,
+      lockbox_recipient_id: recipientId,
       checks: [
         {
           amount,
@@ -585,8 +642,8 @@ export const bankingHandlers = [
       amount,
       description: 'Check deposit via lockbox',
       created_at: new Date().toISOString(),
-      route_id: depositInfo?.lockbox_id || state.lockboxId,
-      route_type: 'lockbox',
+      route_id: depositInfo?.lockbox_recipient_id || state.lockboxRecipientId,
+      route_type: 'lockbox_recipient',
       source: {
         category: 'check_deposit_acceptance',
         check_deposit_acceptance: {

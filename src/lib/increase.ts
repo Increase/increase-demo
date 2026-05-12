@@ -25,7 +25,8 @@ function getDashboardPath(resourceType: string, id: string): string | null {
     check_transfers: 'transfers',
     cards: 'cards',
     transactions: 'transactions',
-    lockboxes: 'lockboxes',
+    lockbox_addresses: 'lockbox_addresses',
+    lockbox_recipients: 'lockbox_recipients',
     inbound_ach_transfers: 'inbound_ach_transfers',
     inbound_wire_transfers: 'inbound_wire_transfers',
     inbound_check_deposits: 'inbound_check_deposits',
@@ -150,16 +151,15 @@ export async function setupDemoSession(
       { description: 'Office Supplies', merchant: 'STAPLES', amount: 12499 },
     ];
 
-    const [accountNumber, lockbox, ...cards] = await Promise.all([
+    const [accountNumber, lockboxAddress, ...cards] = await Promise.all([
       loggedRequest(logFn, 'POST', 'account_numbers', () =>
         client.accountNumbers.create({
           account_id: account.id,
           name: 'Primary Account Number',
         })
       ),
-      loggedRequest(logFn, 'POST', 'lockboxes', () =>
-        client.lockboxes.create({
-          account_id: account.id,
+      loggedRequest(logFn, 'POST', 'lockbox_addresses', () =>
+        client.lockboxAddresses.create({
           description: 'Primary Lockbox',
         })
       ),
@@ -173,8 +173,18 @@ export async function setupDemoSession(
       ),
     ]);
 
+    const lockboxRecipient = await loggedRequest(logFn, 'POST', 'lockbox_recipients', () =>
+      client.lockboxRecipients.create({
+        account_id: account.id,
+        lockbox_address_id: lockboxAddress.id,
+        recipient_name: config.companyName,
+        description: 'Primary Lockbox',
+      })
+    );
+
     result.accountNumber = accountNumber;
-    result.lockbox = lockbox;
+    result.lockboxAddress = lockboxAddress;
+    result.lockboxRecipient = lockboxRecipient;
     result.cards = cards;
 
     // Phase 2a: Initial funding via inbound wire ($10,000)
@@ -193,7 +203,7 @@ export async function setupDemoSession(
       // Inbound mail item with check ($2,500)
       loggedRequest(logFn, 'POST', 'simulations/inbound_mail_items', () =>
         client.simulations.inboundMailItems.create({
-          lockbox_id: lockbox.id,
+          lockbox_recipient_id: lockboxRecipient.id,
           amount: 250000,
         })
       ),
