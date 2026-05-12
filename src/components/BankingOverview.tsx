@@ -6,15 +6,12 @@ import { SimulateInboundModal } from './SimulateInboundModal';
 import { MoveMoneyModal } from './MoveMoneyModal';
 import { getTransferFromSource } from '../types';
 import type { DemoSession, BankingViewState, InboundTransferType } from '../types';
+import { formatCurrency } from '../lib/formatting';
 
 interface BankingOverviewProps {
   session: DemoSession;
   onNavigate: (state: BankingViewState) => void;
   onRefresh: () => void;
-}
-
-function formatCurrency(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 }
 
 function formatDate(dateString: string): string {
