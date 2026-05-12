@@ -352,7 +352,7 @@ export function BankingProvider({ children }: { children: ReactNode }) {
           account_number_id: accountNumberId,
           amount,
           company_name: 'External Company',
-          company_descriptive_date: new Date().toISOString().split('T')[0],
+          company_descriptive_date: new Date().toISOString().slice(2, 10).replace(/-/g, ''),
           company_entry_description: 'Payment',
         });
 
