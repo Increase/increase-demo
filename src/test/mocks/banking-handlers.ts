@@ -360,6 +360,29 @@ export const bankingHandlers = [
     return HttpResponse.json({ data });
   }),
 
+  // Retrieve Lockbox Address
+  http.get('*/lockbox_addresses/:id', async ({ params }) => {
+    const found = state.lockboxAddresses.find((a) => a.id === params.id);
+    if (found) {
+      return HttpResponse.json({ type: 'lockbox_address', ...found, idempotency_key: null });
+    }
+    return HttpResponse.json({
+      type: 'lockbox_address',
+      id: params.id,
+      description: 'Lockbox',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      idempotency_key: null,
+      address: {
+        line1: '2261 Market St',
+        line2: 'Ste 5792',
+        city: 'San Francisco',
+        state: 'CA',
+        postal_code: '94114',
+      },
+    });
+  }),
+
   // Create Lockbox Recipient
   http.post('*/lockbox_recipients', async ({ request }) => {
     const body = (await request.json()) as {

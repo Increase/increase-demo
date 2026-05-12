@@ -10,6 +10,7 @@ export function createIncreaseClient(apiKey: string): Increase {
 
 function getResourceType(path: string): string {
   const segments = path.split('/').filter(Boolean);
+  if (segments[0] === 'simulations' && segments[1]) return segments[1];
   return segments[0] || 'unknown';
 }
 
@@ -25,8 +26,9 @@ function getDashboardPath(resourceType: string, id: string): string | null {
     check_transfers: 'transfers',
     cards: 'cards',
     transactions: 'transactions',
-    lockbox_addresses: 'lockbox_addresses',
-    lockbox_recipients: 'lockbox_recipients',
+    lockbox_addresses: 'lockboxes/lockbox_addresses',
+    lockbox_recipients: 'lockboxes/lockbox_recipients',
+    inbound_mail_items: 'lockboxes/inbound_mail_items',
     inbound_ach_transfers: 'inbound_ach_transfers',
     inbound_wire_transfers: 'inbound_wire_transfers',
     inbound_check_deposits: 'inbound_check_deposits',

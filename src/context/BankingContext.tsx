@@ -260,7 +260,7 @@ export function BankingProvider({ children }: { children: ReactNode }) {
       const client = createIncreaseClient(apiKey);
       const index = lockboxRecipients.length + 1;
 
-      const address = await client.lockboxAddresses.create({
+      const created = await client.lockboxAddresses.create({
         description: `Lockbox ${index}`,
       });
 
@@ -270,9 +270,16 @@ export function BankingProvider({ children }: { children: ReactNode }) {
         path: 'lockbox_addresses',
         status: 200,
         resourceType: 'lockbox_addresses',
-        resourceId: address.id,
+        resourceId: created.id,
         timestamp: new Date(),
       });
+
+      // Increase generates the mailing address asynchronously — poll until it's populated.
+      let address = created;
+      for (let attempt = 0; attempt < 10 && !address.address; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        address = await client.lockboxAddresses.retrieve(created.id);
+      }
 
       const recipient = await client.lockboxRecipients.create({
         account_id: accountId,
