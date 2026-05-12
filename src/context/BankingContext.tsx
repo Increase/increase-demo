@@ -33,7 +33,7 @@ interface BankingContextType {
     apiKey: string,
     accountId: string,
     logFn: (req: ApiRequest) => void
-  ) => Promise<{ address: Increase.LockboxAddress; recipient: Increase.LockboxRecipient }>;
+  ) => Promise<Increase.LockboxRecipient>;
   createCard: (
     apiKey: string,
     accountId: string,
@@ -256,34 +256,17 @@ export function BankingProvider({ children }: { children: ReactNode }) {
       apiKey: string,
       accountId: string,
       logFn: (req: ApiRequest) => void
-    ): Promise<{ address: Increase.LockboxAddress; recipient: Increase.LockboxRecipient }> => {
+    ): Promise<Increase.LockboxRecipient> => {
       const client = createIncreaseClient(apiKey);
       const index = lockboxRecipients.length + 1;
-
-      const created = await client.lockboxAddresses.create({
-        description: `Lockbox ${index}`,
-      });
-
-      logFn({
-        id: crypto.randomUUID(),
-        method: 'POST',
-        path: 'lockbox_addresses',
-        status: 200,
-        resourceType: 'lockbox_addresses',
-        resourceId: created.id,
-        timestamp: new Date(),
-      });
-
-      // Increase generates the mailing address asynchronously — poll until it's populated.
-      let address = created;
-      for (let attempt = 0; attempt < 10 && !address.address; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        address = await client.lockboxAddresses.retrieve(created.id);
+      const addressId = lockboxRecipients[0]?.lockbox_address_id || lockboxAddresses[0]?.id;
+      if (!addressId) {
+        throw new Error('No lockbox address available to roll a recipient against');
       }
 
       const recipient = await client.lockboxRecipients.create({
         account_id: accountId,
-        lockbox_address_id: address.id,
+        lockbox_address_id: addressId,
         description: `Lockbox ${index}`,
       });
 
@@ -297,11 +280,10 @@ export function BankingProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(),
       });
 
-      setLockboxAddresses((prev) => [address, ...prev]);
       setLockboxRecipients((prev) => [recipient, ...prev]);
-      return { address, recipient };
+      return recipient;
     },
-    [lockboxRecipients.length]
+    [lockboxRecipients, lockboxAddresses]
   );
 
   const createCard = useCallback(
