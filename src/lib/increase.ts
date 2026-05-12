@@ -175,17 +175,25 @@ export async function setupDemoSession(
       ),
     ]);
 
+    // Increase generates the lockbox address asynchronously; wait for it to become
+    // active before creating a recipient against it.
+    let activeLockboxAddress = lockboxAddress;
+    for (let attempt = 0; attempt < 20 && activeLockboxAddress.status !== 'active'; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      activeLockboxAddress = await client.lockboxAddresses.retrieve(lockboxAddress.id);
+    }
+
     const lockboxRecipient = await loggedRequest(logFn, 'POST', 'lockbox_recipients', () =>
       client.lockboxRecipients.create({
         account_id: account.id,
-        lockbox_address_id: lockboxAddress.id,
+        lockbox_address_id: activeLockboxAddress.id,
         recipient_name: config.companyName,
         description: 'Primary Lockbox',
       })
     );
 
     result.accountNumber = accountNumber;
-    result.lockboxAddress = lockboxAddress;
+    result.lockboxAddress = activeLockboxAddress;
     result.lockboxRecipient = lockboxRecipient;
     result.cards = cards;
 
