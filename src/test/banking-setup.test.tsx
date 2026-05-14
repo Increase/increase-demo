@@ -37,7 +37,7 @@ describe('Banking Demo Session Setup', () => {
 
     // Step 1: Fill out the setup form
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -98,7 +98,7 @@ describe('Banking Demo Session Setup', () => {
 
     // Complete setup
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -143,7 +143,7 @@ describe('Banking Demo Session Setup', () => {
 
     // Complete setup
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -210,7 +210,7 @@ describe('Banking Demo Session Setup', () => {
 
     // Complete setup
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -287,7 +287,7 @@ describe('Banking Demo Session Setup', () => {
 
     // Complete setup
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');

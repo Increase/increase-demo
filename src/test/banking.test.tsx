@@ -23,7 +23,7 @@ describe('Banking Flow', () => {
 
     // Step 1: Complete setup form with Banking product selected
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -102,7 +102,7 @@ describe('Banking Flow', () => {
 
     // Complete setup form with Banking product
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -172,7 +172,7 @@ describe('Banking Flow', () => {
 
     // Complete setup form with Banking product
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');
@@ -255,7 +255,7 @@ describe('Banking Flow', () => {
 
     // Complete setup form with Banking product
     const apiKeyInput = screen.getByPlaceholderText(/sandbox api key/i);
-    const companyNameInput = screen.getByPlaceholderText(/company name/i);
+    const companyNameInput = screen.getByPlaceholderText(/platform name/i);
 
     await user.clear(apiKeyInput);
     await user.type(apiKeyInput, 'test_api_key_123');

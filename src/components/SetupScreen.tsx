@@ -85,16 +85,16 @@ export function SetupScreen({ onSessionCreated }: SetupScreenProps) {
             disabled={isLoading}
           />
           <TextInput
-            label="Company Name"
-            description="The bill pay platform"
-            placeholder="Enter company name for the demo"
+            label="Platform Name"
+            description="The fintech building on Increase"
+            placeholder="Enter platform name for the demo"
             value={companyName}
             onChange={(e) => setCompanyName(e.currentTarget.value)}
             disabled={isLoading}
           />
           <TextInput
             label="End User Name"
-            description="The customer using the bill pay platform"
+            description="The platform's customer"
             placeholder="Enter end user name"
             value={endUserName}
             onChange={(e) => setEndUserName(e.currentTarget.value)}
