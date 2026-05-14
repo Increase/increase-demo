@@ -80,12 +80,13 @@ export async function setupDemoSession(
 ): Promise<Omit<DemoSession, 'config'>> {
   const client = createIncreaseClient(config.apiKey);
 
-  // 1. Create Corporation Entity
+  // 1. Create Corporation Entity. The entity is the platform's end customer
+  // (each platform user gets their own entity); the platform itself isn't an Increase entity.
   const entity = await loggedRequest(logFn, 'POST', 'entities', () =>
     client.entities.create({
       structure: 'corporation',
       corporation: {
-        name: config.companyName,
+        name: config.endUserName,
         legal_identifier: { value: '12-3456789' },
         address: {
           line1: '123 Main St',
@@ -187,7 +188,7 @@ export async function setupDemoSession(
       client.lockboxRecipients.create({
         account_id: account.id,
         lockbox_address_id: activeLockboxAddress.id,
-        recipient_name: config.companyName,
+        recipient_name: config.endUserName,
         description: 'Primary Lockbox',
       })
     );
